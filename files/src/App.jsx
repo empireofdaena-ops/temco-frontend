@@ -605,12 +605,12 @@ function AdminPortal({ jobs, token, onLogout }) {
       setLoading(true);
       setLoadError("");
       try {
-        const res = await fetch(`${API_BASE}/api/workers`, {
+        const res = await fetch(`${API_BASE}/api/workers?limit=1000`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (!res.ok) throw new Error(`Server responded ${res.status}`);
         const data = await res.json();
-        // Backend may return either a raw array or { workers: [...] }
+        // Backend may return either a raw array or { workers: [...], total }
         const list = Array.isArray(data) ? data : (data.workers || data.data || []);
         if (!cancelled) setWorkers(list);
       } catch (e) {
