@@ -540,18 +540,23 @@ function AdminLogin({ onLogin }) {
     setChecking(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/api/workers`, {
-        headers: { "Authorization": `Bearer ${pw}` }
+      const res = await fetch(`${API_BASE}/api/auth/admin-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw })
       });
       if (res.status === 401 || res.status === 403) {
         setError("Incorrect password.");
         setChecking(false);
         return;
       }
-      // Any other response (200, or even a 404 if route differs) means the
-      // token was accepted by auth middleware — proceed and let the dashboard
-      // handle data fetching from here.
-      onLogin(pw);
+      if (!res.ok) {
+        setError("Could not reach the server. Check your connection and try again.");
+        setChecking(false);
+        return;
+      }
+      const data = await res.json();
+      onLogin(data.token);
     } catch (e) {
       setError("Could not reach the server. Check your connection and try again.");
     } finally {
