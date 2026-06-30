@@ -181,26 +181,86 @@ function PublicHome({ onNav, workerCount, stateCount }) {
 // ─── REQUEST FORM ─────────────────────────────────────────────────────────────
 function RequestForm({ onNav, addJob, states }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({company:"",contact:"",phone:"",email:"",location:"",state:"",date:"",time:"",crew:"4",type:"Load/Unload",duration:"4",notes:""});
+  const [form, setForm] = useState({company:"",contact:"",phone:"",email:"",password:"",location:"",state:"",zip:"",date:"",time:"",crew:"4",type:"Load/Unload",duration:"4",notes:""});
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [createdJob, setCreatedJob] = useState(null);
   const up = (k,v) => setForm(p=>({...p,[k]:v}));
 
-  const handleSubmit = () => {
-    const fee = parseInt(form.crew) * 100;
-    const jobId = `JOB-${1043 + Math.floor(Math.random()*100)}`;
-    addJob({ id:jobId, customer:form.company, location:`${form.location}, ${form.state}`, date:form.date, time:form.time, crew:parseInt(form.crew), type:form.type, status:"Pending", fee, workerIds:[] });
-    setSubmitted(true);
+  const handleSubmit = async () => {
+    if (!form.password || form.password.length < 6) {
+      setSubmitError("Please enter a password of at least 6 characters — this creates your account so you can track this job later.");
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      let token;
+      const registerRes = await fetch(`${API_BASE}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company:form.company, contact_name:form.contact, phone:form.phone, email:form.email, password:form.password }),
+      });
+
+      if (registerRes.status === 409) {
+        const loginRes = await fetch(`${API_BASE}/api/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: form.email, password: form.password }),
+        });
+        if (!loginRes.ok) {
+          setSubmitError("An account already exists for this email. Enter the matching password, or use a different email.");
+          setSubmitting(false);
+          return;
+        }
+        token = (await loginRes.json()).token;
+      } else if (!registerRes.ok) {
+        setSubmitError("Could not create your account. Please check your details and try again.");
+        setSubmitting(false);
+        return;
+      } else {
+        token = (await registerRes.json()).token;
+      }
+
+      const jobRes = await fetch(`${API_BASE}/api/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({
+          location_city: form.location,
+          location_state: form.state,
+          location_zip: form.zip,
+          job_date: form.date,
+          job_time: form.time,
+          crew_size: parseInt(form.crew),
+          work_type: form.type,
+          duration_hours: parseInt(form.duration),
+          special_notes: form.notes,
+        }),
+      });
+      if (!jobRes.ok) {
+        setSubmitError("Your account was created, but the job request couldn't be submitted. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      const jobData = await jobRes.json();
+      setCreatedJob(jobData.job);
+      setSubmitted(true);
+    } catch (e) {
+      setSubmitError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  if (submitted) {
-    const fee = parseInt(form.crew) * 100;
+  if (submitted && createdJob) {
     return (
       <div style={{padding:"60px 40px",maxWidth:540,margin:"0 auto",textAlign:"center"}}>
         <div style={{fontSize:52,marginBottom:14}}>✅</div>
         <h2 style={{fontSize:24,fontWeight:800,color:C.chalk,marginBottom:8}}>Request Submitted</h2>
-        <p style={{color:C.muted,marginBottom:28}}>Our AI dispatch system is matching your crew now. You'll receive an SMS and email confirmation shortly.</p>
+        <p style={{color:C.muted,marginBottom:28}}>Your request has been received and saved. We'll follow up to confirm your crew.</p>
         <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22,marginBottom:24,textAlign:"left"}}>
-          {[[`Location`,`${form.location}, ${form.state}`],[`Date`,form.date],[`Time`,form.time],[`Crew`,`${form.crew} workers`],[`Work Type`,form.type]].map(([k,v])=>(
+          {[[`Job #`,createdJob.job_number],[`Location`,`${createdJob.location_city}, ${createdJob.location_state}`],[`Date`,createdJob.job_date],[`Time`,createdJob.job_time],[`Crew`,`${createdJob.crew_size} workers`],[`Work Type`,createdJob.work_type]].map(([k,v])=>(
             <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
               <span style={{color:C.muted,fontSize:13}}>{k}</span>
               <span style={{color:C.chalk,fontWeight:600,fontSize:13}}>{v}</span>
@@ -208,7 +268,7 @@ function RequestForm({ onNav, addJob, states }) {
           ))}
           <div style={{display:"flex",justifyContent:"space-between",paddingTop:14,marginTop:4}}>
             <span style={{color:C.chalk,fontWeight:700}}>Dispatch Fee</span>
-            <span style={{color:C.amber,fontWeight:900,fontSize:20}}>${fee}</span>
+            <span style={{color:C.amber,fontWeight:900,fontSize:20}}>${createdJob.dispatch_fee}</span>
           </div>
         </div>
         <button onClick={()=>onNav("customer-portal")} style={btn()}>View in Customer Portal →</button>
@@ -237,12 +297,17 @@ function RequestForm({ onNav, addJob, states }) {
             <div><label style={label}>Phone</label><input style={field} value={form.phone} onChange={e=>up("phone",e.target.value)} placeholder="(214) 555-0000"/></div>
             <div><label style={label}>Email</label><input style={field} value={form.email} onChange={e=>up("email",e.target.value)} placeholder="you@company.com"/></div>
           </div>
+          <div>
+            <label style={label}>Create a Password</label>
+            <input type="password" style={field} value={form.password} onChange={e=>up("password",e.target.value)} placeholder="At least 6 characters"/>
+            <div style={{fontSize:11,color:C.muted,marginTop:5}}>This creates your account so you can track this job in the Customer Portal.</div>
+          </div>
         </div>
       )}
 
       {step===2 && (
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:12}}>
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:12}}>
             <div><label style={label}>City</label><input style={field} value={form.location} onChange={e=>up("location",e.target.value)} placeholder="Dallas"/></div>
             <div>
               <label style={label}>State</label>
@@ -251,6 +316,7 @@ function RequestForm({ onNav, addJob, states }) {
                 {states.map(s=><option key={s}>{s}</option>)}
               </select>
             </div>
+            <div><label style={label}>ZIP</label><input style={field} value={form.zip} onChange={e=>up("zip",e.target.value)} placeholder="75201"/></div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <div><label style={label}>Date</label><input type="date" style={field} value={form.date} onChange={e=>up("date",e.target.value)}/></div>
@@ -292,10 +358,11 @@ function RequestForm({ onNav, addJob, states }) {
         </div>
       )}
 
+      {submitError && <div style={{color:C.red,fontSize:12,marginTop:14}}>{submitError}</div>}
       <div style={{display:"flex",gap:10,marginTop:20}}>
-        {step>1 && <button onClick={()=>setStep(s=>s-1)} style={btn("ghost")}>← Back</button>}
-        <button onClick={()=>step<3?setStep(s=>s+1):handleSubmit()} style={{...btn(),flex:1}}>
-          {step===3?"Submit & Dispatch →":"Continue →"}
+        {step>1 && <button onClick={()=>setStep(s=>s-1)} disabled={submitting} style={btn("ghost")}>← Back</button>}
+        <button onClick={()=>step<3?setStep(s=>s+1):handleSubmit()} disabled={submitting} style={{...btn(),flex:1,opacity:submitting?0.6:1}}>
+          {step===3 ? (submitting ? "Submitting..." : "Submit Request →") : "Continue →"}
         </button>
       </div>
     </div>
@@ -588,7 +655,7 @@ function AdminLogin({ onLogin }) {
 }
 
 // ─── ADMIN PORTAL ─────────────────────────────────────────────────────────────
-function AdminPortal({ jobs, token, onLogout }) {
+function AdminPortal({ token, onLogout }) {
   const [tab, setTab] = useState("overview");
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState("");
@@ -598,6 +665,33 @@ function AdminPortal({ jobs, token, onLogout }) {
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+
+  const [liveJobs, setLiveJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsLoadError, setJobsLoadError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadJobs() {
+      setJobsLoading(true);
+      setJobsLoadError("");
+      try {
+        const res = await fetch(`${API_BASE}/api/jobs/admin/all`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error(`Server responded ${res.status}`);
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.jobs || []);
+        if (!cancelled) setLiveJobs(list);
+      } catch (e) {
+        if (!cancelled) setJobsLoadError("Could not load live job data. " + e.message);
+      } finally {
+        if (!cancelled) setJobsLoading(false);
+      }
+    }
+    loadJobs();
+    return () => { cancelled = true; };
+  }, [token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -654,7 +748,20 @@ function AdminPortal({ jobs, token, onLogout }) {
   }, [normalizedWorkers, search, stateFilter, skillFilter, statusFilter]);
 
   const byState = STATES.map(s=>({state:s, count:normalizedWorkers.filter(w=>w.state===s).length})).sort((a,b)=>b.count-a.count);
-  const totalFees = jobs.reduce((a,j)=>a+j.fee,0);
+
+  const normalizedJobs = useMemo(() => liveJobs.map(j => ({
+    id: j.job_number || j.id,
+    customer: j.company || j.contact_name || "—",
+    location: [j.location_city, j.location_state].filter(Boolean).join(", "),
+    date: j.job_date,
+    time: j.job_time,
+    crew: j.crew_size,
+    type: j.work_type,
+    status: j.status,
+    fee: j.dispatch_fee,
+  })), [liveJobs]);
+
+  const totalFees = normalizedJobs.reduce((a,j)=>a+(j.fee||0),0);
 
   return (
     <div style={{padding:"28px"}}>
@@ -662,29 +769,29 @@ function AdminPortal({ jobs, token, onLogout }) {
         <SectionTitle title="Admin Dashboard" sub="TEMCO National Dispatch Operations" />
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{display:"flex",alignItems:"center",gap:8,background:C.navyMid,padding:"6px 14px",borderRadius:8,border:`1px solid ${C.border}`}}>
-            <div style={{width:7,height:7,borderRadius:"50%",background:loadError?C.red:C.green,boxShadow:`0 0 8px ${loadError?C.red:C.green}`}}/>
-            <span style={{color:loadError?C.red:C.green,fontSize:12,fontWeight:700}}>{loadError ? "DATA ERROR" : "SYSTEM LIVE"}</span>
+            <div style={{width:7,height:7,borderRadius:"50%",background:(loadError||jobsLoadError)?C.red:C.green,boxShadow:`0 0 8px ${(loadError||jobsLoadError)?C.red:C.green}`}}/>
+            <span style={{color:(loadError||jobsLoadError)?C.red:C.green,fontSize:12,fontWeight:700}}>{(loadError||jobsLoadError) ? "DATA ERROR" : "SYSTEM LIVE"}</span>
           </div>
           <button onClick={onLogout} style={{...btn("ghost"),padding:"6px 14px",fontSize:12}}>Log Out</button>
         </div>
       </div>
 
-      {loadError && (
+      {(loadError || jobsLoadError) && (
         <div style={{background:"#2A1A1A",border:`1px solid ${C.red}55`,borderRadius:10,padding:"12px 16px",marginBottom:20,color:C.red,fontSize:13}}>
-          {loadError} — showing what data is available below.
+          {[loadError, jobsLoadError].filter(Boolean).join(" ")} — showing what data is available below.
         </div>
       )}
 
       <Tabs tabs={[["overview","Overview"],["workers","Workers"],["jobs","All Jobs"],["dispatch","Dispatch Sim"]]} active={tab} onChange={setTab}/>
 
-      {loading ? <Spinner/> : (
+      {(loading || jobsLoading) ? <Spinner/> : (
       <>
       {/* ── OVERVIEW ── */}
       {tab==="overview" && (
         <div>
           <div style={{display:"flex",gap:14,marginBottom:24,flexWrap:"wrap"}}>
             <StatCard label="Workers in Network" value={normalizedWorkers.length} color={C.green} sub={`${STATES.length} states`}/>
-            <StatCard label="Active Jobs" value={jobs.filter(j=>j.status==="In Progress"||j.status==="Confirmed").length} color={C.amber}/>
+            <StatCard label="Active Jobs" value={normalizedJobs.filter(j=>j.status==="In Progress"||j.status==="Confirmed").length} color={C.amber}/>
             <StatCard label="Revenue (MTD)" value={`$${totalFees.toLocaleString()}`} color={C.chalk}/>
             <StatCard label="Fill Rate" value="97%" color={C.green}/>
           </div>
@@ -695,7 +802,7 @@ function AdminPortal({ jobs, token, onLogout }) {
               <span>Live Dispatch Activity</span>
               <div style={{width:6,height:6,borderRadius:"50%",background:C.green,boxShadow:`0 0 6px ${C.green}`}}/>
             </div>
-            {jobs.filter(j=>j.status!=="Completed").map(j=>(
+            {normalizedJobs.filter(j=>j.status!=="Completed").map(j=>(
               <div key={j.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 0",borderBottom:`1px solid ${C.border}`,flexWrap:"wrap",gap:8}}>
                 <div>
                   <span style={{color:C.amber,fontWeight:700,marginRight:10}}>{j.id}</span>
@@ -782,9 +889,9 @@ function AdminPortal({ jobs, token, onLogout }) {
       {tab==="jobs" && (
         <div style={{overflowX:"auto"}}>
           <div style={{display:"flex",gap:14,marginBottom:20,flexWrap:"wrap"}}>
-            <StatCard label="Total Jobs" value={jobs.length}/>
+            <StatCard label="Total Jobs" value={normalizedJobs.length}/>
             <StatCard label="Revenue" value={`$${totalFees.toLocaleString()}`} color={C.green}/>
-            <StatCard label="Completed" value={jobs.filter(j=>j.status==="Completed").length} color={C.muted}/>
+            <StatCard label="Completed" value={normalizedJobs.filter(j=>j.status==="Completed").length} color={C.muted}/>
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
             <thead><tr style={{borderBottom:`1px solid ${C.border}`}}>
@@ -792,7 +899,7 @@ function AdminPortal({ jobs, token, onLogout }) {
                 <th key={h} style={{textAlign:"left",padding:"9px 12px",color:C.muted,fontWeight:700,fontSize:10,textTransform:"uppercase"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{jobs.map(j=>(
+            <tbody>{normalizedJobs.map(j=>(
               <tr key={j.id} style={{borderBottom:`1px solid ${C.border}`}}>
                 <td style={{padding:"11px 12px",color:C.amber,fontWeight:700}}>{j.id}</td>
                 <td style={{padding:"11px 12px",color:C.chalk}}>{j.customer}</td>
@@ -804,8 +911,10 @@ function AdminPortal({ jobs, token, onLogout }) {
               </tr>
             ))}</tbody>
           </table>
+          {normalizedJobs.length===0 && <div style={{padding:30,color:C.muted,fontSize:13,textAlign:"center"}}>No jobs yet. Submitted requests will appear here.</div>}
         </div>
       )}
+
 
       {/* ── DISPATCH SIM ── */}
       {tab==="dispatch" && <DispatchSim workers={normalizedWorkers} states={STATES} />}
