@@ -186,7 +186,32 @@ function RequestForm({ onNav, addJob, states }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [createdJob, setCreatedJob] = useState(null);
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError, setPayError] = useState("");
   const up = (k,v) => setForm(p=>({...p,[k]:v}));
+
+  const handlePayment = async () => {
+    setPayLoading(true);
+    setPayError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/payments/create-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: createdJob.id })
+      });
+      if (!res.ok) throw new Error("Payment session failed");
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setPayError("Could not create payment session. Please try again.");
+      }
+    } catch (e) {
+      setPayError("Could not reach the payment server. Please try again.");
+    } finally {
+      setPayLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!form.password || form.password.length < 6) {
@@ -271,7 +296,11 @@ function RequestForm({ onNav, addJob, states }) {
             <span style={{color:C.amber,fontWeight:900,fontSize:20}}>${parseFloat(createdJob.dispatch_fee||0).toLocaleString()}</span>
           </div>
         </div>
-        <button onClick={()=>onNav("customer-portal")} style={btn()}>View in Customer Portal →</button>
+        <button onClick={handlePayment} disabled={payLoading} style={{...btn(),width:"100%",padding:"14px",fontSize:15,opacity:payLoading?0.6:1}}>
+          {payLoading ? "Redirecting to payment..." : "💳 Pay Dispatch Fee →"}
+        </button>
+        {payError && <div style={{color:C.red,fontSize:12,marginTop:8,textAlign:"center"}}>{payError}</div>}
+        <button onClick={()=>onNav("customer-portal")} style={{...btn("ghost"),width:"100%",marginTop:10}}>View in Customer Portal</button>
       </div>
     );
   }
@@ -1028,11 +1057,54 @@ function DispatchSim({ workers, states }) {
   );
 }
 
+// ─── PAYMENT SUCCESS ──────────────────────────────────────────────────────────
+function PaymentSuccess({ onNav }) {
+  return (
+    <div style={{padding:"64px 40px",maxWidth:500,margin:"0 auto",textAlign:"center"}}>
+      <div style={{fontSize:52,marginBottom:14}}>✅</div>
+      <h2 style={{fontSize:24,fontWeight:800,color:C.chalk,marginBottom:8}}>Payment Confirmed!</h2>
+      <p style={{color:C.muted,lineHeight:1.7,marginBottom:28}}>
+        Your dispatch fee has been received. You'll receive a text shortly with your crew details — names, phone numbers, and your crew lead. They're on their way.
+      </p>
+      <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20,marginBottom:24}}>
+        <div style={{fontSize:13,color:C.muted,lineHeight:1.8}}>
+          <div>✓ Payment processed</div>
+          <div>✓ Crew assigned and confirmed</div>
+          <div>✓ Worker info sent to your phone</div>
+        </div>
+      </div>
+      <button onClick={()=>onNav("home")} style={{...btn(),padding:"13px 28px"}}>Back to Home →</button>
+    </div>
+  );
+}
+
+// ─── PAYMENT CANCELLED ────────────────────────────────────────────────────────
+function PaymentCancelled({ onNav }) {
+  return (
+    <div style={{padding:"64px 40px",maxWidth:500,margin:"0 auto",textAlign:"center"}}>
+      <div style={{fontSize:52,marginBottom:14}}>↩️</div>
+      <h2 style={{fontSize:24,fontWeight:800,color:C.chalk,marginBottom:8}}>Payment Cancelled</h2>
+      <p style={{color:C.muted,lineHeight:1.7,marginBottom:28}}>
+        No charge was made. Your job request is still saved — complete payment any time to confirm your crew.
+      </p>
+      <button onClick={()=>onNav("request")} style={{...btn(),padding:"13px 28px"}}>Submit New Request →</button>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState("home");
   const [jobs, setJobs] = useState(INITIAL_JOBS);
   const [adminToken, setAdminToken] = useState(null);
+
+  // Detect Stripe redirect on mount
+  useEffect(() => {
+    const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    if (path.includes("payment-success")) setPage("payment-success");
+    else if (path.includes("payment-cancelled")) setPage("payment-cancelled");
+  }, []);
 
   const addJob = (job) => setJobs(prev => [job, ...prev]);
 
@@ -1058,6 +1130,8 @@ export default function App() {
     "worker-signup":<WorkerSignup states={FALLBACK_STATES}/>,
     "customer-portal":<CustomerPortal jobs={jobs}/>,
     "worker-portal":<WorkerPortal/>,
+    "payment-success":<PaymentSuccess onNav={setPage}/>,
+    "payment-cancelled":<PaymentCancelled onNav={setPage}/>,
     admin: adminToken
       ? <AdminPortal jobs={jobs} token={adminToken} onLogout={handleAdminLogout}/>
       : <AdminLogin onLogin={setAdminToken}/>,
