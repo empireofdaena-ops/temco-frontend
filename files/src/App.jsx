@@ -260,7 +260,7 @@ function RequestForm({ onNav, addJob, states }) {
         <h2 style={{fontSize:24,fontWeight:800,color:C.chalk,marginBottom:8}}>Request Submitted</h2>
         <p style={{color:C.muted,marginBottom:28}}>Your request has been received and saved. We'll follow up to confirm your crew.</p>
         <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22,marginBottom:24,textAlign:"left"}}>
-          {[[`Job #`,createdJob.job_number],[`Location`,`${createdJob.location_city}, ${createdJob.location_state}`],[`Date`,createdJob.job_date],[`Time`,createdJob.job_time],[`Crew`,`${createdJob.crew_size} workers`],[`Work Type`,createdJob.work_type]].map(([k,v])=>(
+          {[[`Job #`,createdJob.job_number],[`Location`,`${createdJob.location_city}, ${createdJob.location_state}`],[`Date`,createdJob.job_date ? createdJob.job_date.slice(0,10) : '—'],[`Time`,createdJob.job_time ? createdJob.job_time.slice(0,5) : '—'],[`Crew`,`${createdJob.crew_size} workers`],[`Work Type`,createdJob.work_type]].map(([k,v])=>(
             <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
               <span style={{color:C.muted,fontSize:13}}>{k}</span>
               <span style={{color:C.chalk,fontWeight:600,fontSize:13}}>{v}</span>
@@ -268,7 +268,7 @@ function RequestForm({ onNav, addJob, states }) {
           ))}
           <div style={{display:"flex",justifyContent:"space-between",paddingTop:14,marginTop:4}}>
             <span style={{color:C.chalk,fontWeight:700}}>Dispatch Fee</span>
-            <span style={{color:C.amber,fontWeight:900,fontSize:20}}>${createdJob.dispatch_fee}</span>
+            <span style={{color:C.amber,fontWeight:900,fontSize:20}}>${parseFloat(createdJob.dispatch_fee||0).toLocaleString()}</span>
           </div>
         </div>
         <button onClick={()=>onNav("customer-portal")} style={btn()}>View in Customer Portal →</button>
@@ -387,11 +387,14 @@ function WorkerSignup({ states }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error("Submission failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Submission failed. Please check your details and try again.");
+        return;
+      }
       setSubmitted(true);
     } catch (e) {
-      // Backend route may not exist yet — don't block the user, just show confirmation
-      setSubmitted(true);
+      setError("Could not reach the server. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -753,12 +756,12 @@ function AdminPortal({ token, onLogout }) {
     id: j.job_number || j.id,
     customer: j.company || j.contact_name || "—",
     location: [j.location_city, j.location_state].filter(Boolean).join(", "),
-    date: j.job_date,
-    time: j.job_time,
+    date: j.job_date ? j.job_date.slice(0, 10) : '—',
+    time: j.job_time ? j.job_time.slice(0, 5) : '—',
     crew: j.crew_size,
     type: j.work_type,
     status: j.status,
-    fee: j.dispatch_fee,
+    fee: parseFloat(j.dispatch_fee) || 0,
   })), [liveJobs]);
 
   const totalFees = normalizedJobs.reduce((a,j)=>a+(j.fee||0),0);
@@ -791,7 +794,7 @@ function AdminPortal({ token, onLogout }) {
         <div>
           <div style={{display:"flex",gap:14,marginBottom:24,flexWrap:"wrap"}}>
             <StatCard label="Workers in Network" value={normalizedWorkers.length} color={C.green} sub={`${STATES.length} states`}/>
-            <StatCard label="Active Jobs" value={normalizedJobs.filter(j=>j.status==="In Progress"||j.status==="Confirmed").length} color={C.amber}/>
+            <StatCard label="Active Jobs" value={normalizedJobs.filter(j=>j.status==="In Progress"||j.status==="Confirmed"||j.status==="Pending").length} color={C.amber}/>
             <StatCard label="Revenue (MTD)" value={`$${totalFees.toLocaleString()}`} color={C.chalk}/>
             <StatCard label="Fill Rate" value="97%" color={C.green}/>
           </div>
