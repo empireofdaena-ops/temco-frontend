@@ -715,6 +715,73 @@ function AdminPortal({ token, onLogout }) {
   const [jobsLoading, setJobsLoading] = useState(true);
   const [jobsLoadError, setJobsLoadError] = useState("");
 
+  const [expandedJobId, setExpandedJobId] = useState(null);
+  const [jobWorkers, setJobWorkers] = useState({});
+  const [actionLoading, setActionLoading] = useState({});
+  const [actionResults, setActionResults] = useState({});
+
+  const handleExpandJob = async (job) => {
+    if (expandedJobId === job.rawId) { setExpandedJobId(null); return; }
+    setExpandedJobId(job.rawId);
+    if (!jobWorkers[job.rawId]) {
+      try {
+        const res = await fetch(`${API_BASE}/api/jobs/${job.rawId}/workers`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        setJobWorkers(prev => ({...prev, [job.rawId]: data.workers || []}));
+      } catch(e) {
+        setJobWorkers(prev => ({...prev, [job.rawId]: []}));
+      }
+    }
+  };
+
+  const handleReleaseCrewManually = async (jobId) => {
+    setActionLoading(prev => ({...prev, [jobId]: true}));
+    try {
+      const res = await fetch(`${API_BASE}/api/jobs/${jobId}/manual-release`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      setActionResults(prev => ({...prev, [jobId]: res.ok ? `✓ Crew info sent to customer — ${data.crew?.length || 0} workers released` : `Error: ${data.error}`}));
+    } catch(e) {
+      setActionResults(prev => ({...prev, [jobId]: "Could not reach server"}));
+    } finally {
+      setActionLoading(prev => ({...prev, [jobId]: false}));
+    }
+  };
+
+  const handleRedispatch = async (jobId) => {
+    setActionLoading(prev => ({...prev, [jobId]: true}));
+    try {
+      const res = await fetch(`${API_BASE}/api/jobs/${jobId}/redispatch`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      setActionResults(prev => ({...prev, [jobId]: res.ok ? "✓ Additional dispatch triggered — contacting more workers" : `Error: ${data.error}`}));
+    } catch(e) {
+      setActionResults(prev => ({...prev, [jobId]: "Could not reach server"}));
+    } finally {
+      setActionLoading(prev => ({...prev, [jobId]: false}));
+    }
+  };
+
+  const handleNoShow = async (jobId, workerId, workerName) => {
+    if (!window.confirm(`Mark ${workerName} as a no-show? This will reduce their dispatch priority.`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/jobs/${jobId}/noshow/${workerId}`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setJobWorkers(prev => ({...prev, [jobId]: (prev[jobId]||[]).map(w => w.worker_id===workerId ? {...w, no_show:true} : w)}));
+        setActionResults(prev => ({...prev, [jobId]: `⚠ ${workerName} marked as no-show. Rating reduced.`}));
+      }
+    } catch(e) { console.error("No-show update failed", e); }
+  };
+
   useEffect(() => {
     let cancelled = false;
     async function loadJobs() {
@@ -795,6 +862,7 @@ function AdminPortal({ token, onLogout }) {
   const byState = STATES.map(s=>({state:s, count:normalizedWorkers.filter(w=>w.state===s).length})).sort((a,b)=>b.count-a.count);
 
   const normalizedJobs = useMemo(() => liveJobs.map(j => ({
+    rawId: j.id,
     id: j.job_number || j.id,
     customer: j.company || j.contact_name || "—",
     location: [j.location_city, j.location_state].filter(Boolean).join(", "),
@@ -932,31 +1000,91 @@ function AdminPortal({ token, onLogout }) {
 
       {/* ── ALL JOBS ── */}
       {tab==="jobs" && (
-        <div style={{overflowX:"auto"}}>
+        <div>
           <div style={{display:"flex",gap:14,marginBottom:20,flexWrap:"wrap"}}>
             <StatCard label="Total Jobs" value={normalizedJobs.length}/>
             <StatCard label="Revenue" value={`$${totalFees.toLocaleString()}`} color={C.green}/>
+            <StatCard label="Active" value={normalizedJobs.filter(j=>["Pending","Dispatching","Confirmed"].includes(j.status)).length} color={C.amber}/>
             <StatCard label="Completed" value={normalizedJobs.filter(j=>j.status==="Completed").length} color={C.muted}/>
           </div>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-            <thead><tr style={{borderBottom:`1px solid ${C.border}`}}>
-              {["Job ID","Customer","Location","Date","Crew","Fee","Status"].map(h=>(
-                <th key={h} style={{textAlign:"left",padding:"9px 12px",color:C.muted,fontWeight:700,fontSize:10,textTransform:"uppercase"}}>{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>{normalizedJobs.map(j=>(
-              <tr key={j.id} style={{borderBottom:`1px solid ${C.border}`}}>
-                <td style={{padding:"11px 12px",color:C.amber,fontWeight:700}}>{j.id}</td>
-                <td style={{padding:"11px 12px",color:C.chalk}}>{j.customer}</td>
-                <td style={{padding:"11px 12px",color:C.chalk}}>{j.location}</td>
-                <td style={{padding:"11px 12px",color:C.chalk}}>{j.date}</td>
-                <td style={{padding:"11px 12px",color:C.chalk}}>{j.crew}</td>
-                <td style={{padding:"11px 12px",color:C.green,fontWeight:700}}>${j.fee}</td>
-                <td style={{padding:"11px 12px"}}><Badge status={j.status}/></td>
-              </tr>
-            ))}</tbody>
-          </table>
           {normalizedJobs.length===0 && <div style={{padding:30,color:C.muted,fontSize:13,textAlign:"center"}}>No jobs yet. Submitted requests will appear here.</div>}
+          {normalizedJobs.map(j=>(
+            <div key={j.rawId} style={{background:C.navyMid,border:`1px solid ${expandedJobId===j.rawId?C.amber:C.border}`,borderRadius:10,marginBottom:10,overflow:"hidden",transition:"border-color 0.2s"}}>
+              {/* Job row — click to expand */}
+              <div onClick={()=>handleExpandJob(j)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",flexWrap:"wrap",gap:10,cursor:"pointer"}}>
+                <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
+                  <span style={{color:C.amber,fontWeight:800,fontSize:14}}>{j.id}</span>
+                  <span style={{color:C.chalk,fontSize:13,fontWeight:600}}>{j.customer}</span>
+                  <span style={{color:C.muted,fontSize:12}}>{j.location}</span>
+                  <span style={{color:C.muted,fontSize:12}}>{j.date}</span>
+                  <span style={{color:C.chalk,fontSize:12}}>{j.crew} workers</span>
+                  <span style={{color:C.green,fontWeight:700}}>${j.fee}</span>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <Badge status={j.status}/>
+                  <span style={{color:C.muted,fontSize:12}}>{expandedJobId===j.rawId?"▲":"▼"}</span>
+                </div>
+              </div>
+
+              {/* Expanded panel */}
+              {expandedJobId===j.rawId && (
+                <div style={{borderTop:`1px solid ${C.border}`,padding:"18px 18px"}}>
+                  {/* Action buttons */}
+                  <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+                    <button onClick={()=>handleReleaseCrewManually(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.green,color:"white",border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
+                      📤 Release Crew to Customer
+                    </button>
+                    <button onClick={()=>handleRedispatch(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.blue,color:"white",border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
+                      🔄 Re-Dispatch More Workers
+                    </button>
+                  </div>
+
+                  {/* Action result */}
+                  {actionResults[j.rawId] && (
+                    <div style={{fontSize:12,color:actionResults[j.rawId].startsWith("✓")?C.green:actionResults[j.rawId].startsWith("⚠")?C.amber:C.red,marginBottom:14,padding:"8px 14px",background:C.navyLight,borderRadius:6,fontWeight:600}}>
+                      {actionResults[j.rawId]}
+                    </div>
+                  )}
+
+                  {/* Workers */}
+                  <div style={{fontSize:11,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>Assigned Workers</div>
+                  {!jobWorkers[j.rawId] ? (
+                    <div style={{color:C.muted,fontSize:13}}>Loading...</div>
+                  ) : jobWorkers[j.rawId].length===0 ? (
+                    <div style={{color:C.muted,fontSize:13}}>No workers assigned yet. Use Re-Dispatch to find workers.</div>
+                  ) : (
+                    jobWorkers[j.rawId].map(w=>(
+                      <div key={w.worker_id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${C.border}`,flexWrap:"wrap",gap:8}}>
+                        <div>
+                          <span style={{color:C.chalk,fontWeight:600,fontSize:13}}>{w.name}</span>
+                          <span style={{color:C.muted,fontSize:12,marginLeft:10}}>{w.phone}</span>
+                          <span style={{fontSize:10,color:C.blue,marginLeft:10,fontWeight:700}}>{w.role}</span>
+                          {w.city && <span style={{color:C.muted,fontSize:11,marginLeft:8}}>{w.city}, {w.state}</span>}
+                        </div>
+                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                          <span style={{
+                            fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:20,
+                            background:w.response==='YES'?"#163B2A":w.response==='NO'?"#2A1A1A":w.no_show?"#2A1A1A":"#1A1A2E",
+                            color:w.response==='YES'?C.green:w.response==='NO'?C.red:w.no_show?C.red:C.muted
+                          }}>
+                            {w.no_show?"NO-SHOW":w.response||"Pending"}
+                          </span>
+                          {w.sms_sent && !w.response && !w.no_show && (
+                            <span style={{fontSize:10,color:C.muted}}>📱 SMS sent</span>
+                          )}
+                          {w.confirmed && !w.no_show && (
+                            <button onClick={()=>handleNoShow(j.rawId, w.worker_id, w.name)} style={{background:"transparent",color:C.red,border:`1px solid ${C.red}44`,padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                              Mark No-Show
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
