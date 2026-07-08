@@ -1364,7 +1364,7 @@ export default function App() {
   ];
 
   const pages = {
-    home:<PublicHome onNav={setPage} workerCount={584} stateCount={47}/>,
+    home:<PublicHome onNav={setPage} workerCount={546} stateCount={49}/>,
     request:<RequestForm onNav={setPage} addJob={addJob} states={FALLBACK_STATES}/>,
     "worker-signup":<WorkerSignup states={FALLBACK_STATES}/>,
     "customer-portal":<CustomerPortal jobs={jobs}/>,
