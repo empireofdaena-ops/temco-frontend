@@ -168,11 +168,12 @@ function PublicHome({ onNav, workerCount, stateCount }) {
       {/* Footer */}
       <div style={{padding:"32px 40px",textAlign:"center",color:C.muted,fontSize:12}}>
         <div style={{display:"flex",gap:20,justifyContent:"center",flexWrap:"wrap",marginBottom:12}}>
-          {["About","Contact","Terms of Service","Privacy Policy"].map(l=>(
-            <span key={l} style={{cursor:"pointer"}}>{l}</span>
-          ))}
+          <span style={{cursor:"pointer"}} onClick={()=>onNav("terms")}>Terms of Service</span>
+          <span style={{cursor:"pointer"}} onClick={()=>onNav("privacy")}>Privacy Policy</span>
+          <span style={{cursor:"pointer"}} onClick={()=>onNav("worker-agreement")}>Worker Agreement</span>
+          <span style={{cursor:"pointer"}}>Contact: (347) 835-4479</span>
         </div>
-        © 2026 TEMCO National Labor Dispatch Network. All rights reserved.
+        © 2026 The Empire Moving Co., LLC d/b/a TEMCO National Labor Dispatch Network. All rights reserved.
       </div>
     </div>
   );
@@ -384,6 +385,12 @@ function RequestForm({ onNav, addJob, states }) {
             <span style={{color:C.amber,fontWeight:900,fontSize:22}}>${parseInt(form.crew||0)*100}</span>
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:8}}>Pay workers directly on-site. TEMCO never processes payroll.</div>
+          <div style={{marginTop:16,display:"flex",alignItems:"flex-start",gap:10}}>
+            <input type="checkbox" id="tos" style={{marginTop:2,accentColor:C.amber,width:16,height:16,flexShrink:0}} required/>
+            <label htmlFor="tos" style={{fontSize:12,color:C.muted,lineHeight:1.5,cursor:"pointer"}}>
+              I agree to TEMCO's <span style={{color:C.amber,cursor:"pointer"}} onClick={()=>window.open('#terms','_blank')}>Terms of Service</span> and acknowledge that workers are independent contractors paid directly on-site. The dispatch fee is non-refundable once workers are confirmed.
+            </label>
+          </div>
         </div>
       )}
 
@@ -471,6 +478,12 @@ function WorkerSignup({ states }) {
           </div>
         </div>
         <div><label style={label}>Notes / Equipment / Crew Size</label><textarea style={{...field,resize:"vertical",minHeight:72}} value={form.notes} onChange={e=>up("notes",e.target.value)} placeholder="Own tools, dollies, travel radius, crew size..."/></div>
+        <div style={{display:"flex",alignItems:"flex-start",gap:10,marginTop:4}}>
+          <input type="checkbox" id="worker-tos" style={{marginTop:2,accentColor:C.amber,width:16,height:16,flexShrink:0}} required/>
+          <label htmlFor="worker-tos" style={{fontSize:12,color:C.muted,lineHeight:1.5,cursor:"pointer"}}>
+            I agree to TEMCO's <span style={{color:C.amber}}>Worker Agreement</span> and understand I am joining as an independent contractor. I consent to receive automated SMS job offers from TEMCO. Reply STOP to any message to opt out.
+          </label>
+        </div>
         {error && <div style={{color:C.red,fontSize:12}}>{error}</div>}
         <button onClick={handleSubmit} disabled={submitting} style={{...btn(),padding:"13px",fontSize:14,marginTop:4,opacity:submitting?0.6:1}}>
           {submitting ? "Submitting..." : "Submit Application →"}
@@ -1057,6 +1070,104 @@ function DispatchSim({ workers, states }) {
   );
 }
 
+// ─── LEGAL PAGES ─────────────────────────────────────────────────────────────
+function LegalPage({ title, children, onNav }) {
+  return (
+    <div style={{maxWidth:720,margin:"0 auto",padding:"40px 28px"}}>
+      <button onClick={()=>onNav("home")} style={{...btn("ghost"),marginBottom:24,fontSize:12,padding:"6px 14px"}}>← Back to Home</button>
+      <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:14,padding:36}}>
+        <div style={{fontSize:11,color:C.amber,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>Legal</div>
+        <h1 style={{fontSize:24,fontWeight:800,color:C.chalk,marginBottom:4}}>{title}</h1>
+        <div style={{fontSize:12,color:C.muted,marginBottom:28}}>The Empire Moving Co., LLC d/b/a TEMCO National Labor Dispatch Network · Effective July 7, 2026</div>
+        {children}
+      </div>
+      <div style={{marginTop:20,textAlign:"center",fontSize:11,color:C.muted}}>
+        © 2026 The Empire Moving Co., LLC d/b/a TEMCO National Labor Dispatch Network
+      </div>
+    </div>
+  );
+}
+
+function section(title) {
+  return <div style={{fontSize:11,fontWeight:700,color:"#F5A623",letterSpacing:"0.08em",textTransform:"uppercase",marginTop:28,marginBottom:10}}>{title}</div>;
+}
+function para(text) {
+  return <p style={{fontSize:13,color:"#C8D0DC",lineHeight:1.7,marginBottom:10}}>{text}</p>;
+}
+function bullet(items) {
+  return <ul style={{margin:"6px 0 12px 18px"}}>{items.map((t,i)=><li key={i} style={{fontSize:13,color:"#C8D0DC",lineHeight:1.6,marginBottom:5}}>{t}</li>)}</ul>;
+}
+
+function TermsPage({ onNav }) {
+  return (
+    <LegalPage title="Terms of Service" onNav={onNav}>
+      {section("1. About TEMCO")}
+      {para("TEMCO National Labor Dispatch Network is operated by The Empire Moving Co., LLC, a California limited liability company. TEMCO is a labor dispatch marketplace — a technology platform that connects businesses seeking moving labor with independent workers available in their area. TEMCO is not a moving company, staffing agency, or employer.")}
+      {section("2. Dispatch Fee & Payment")}
+      {para("TEMCO charges a flat dispatch fee of $75–$125 per Helper dispatched. This fee is charged via Stripe upon crew confirmation.")}
+      {para("⚠ The dispatch fee is non-refundable once workers have been contacted and confirmed for your job.")}
+      {section("3. Worker Compensation")}
+      {para("Helpers are paid directly by the Customer on-site. TEMCO does not process, hold, or distribute worker pay. The dispatch fee is entirely separate from worker compensation.")}
+      {section("4. Customer Responsibilities")}
+      {bullet(["Provide accurate job details","Pay Helpers directly on-site","Provide a safe working environment compliant with OSHA regulations","Not solicit or directly hire Helpers found through TEMCO for 12 months","Report no-shows or incidents to TEMCO promptly"])}
+      {section("5. Independent Contractor Status")}
+      {para("All Helpers are independent contractors, not employees of TEMCO or the Customer. Customers are responsible for compliance with all applicable contractor engagement laws in their state.")}
+      {section("6. Limitation of Liability")}
+      {para("TEMCO is not liable for property damage, cargo loss, personal injury, no-shows, pay disputes, or platform downtime. TEMCO's total liability shall not exceed the dispatch fee paid for the specific job.")}
+      {section("7. Disputes & Governing Law")}
+      {para("Disputes shall be resolved through binding arbitration in Fresno, California under AAA Commercial Arbitration Rules. These Terms are governed by California law.")}
+      {section("8. Contact")}
+      {para("The Empire Moving Co., LLC d/b/a TEMCO · Phone/Text: (347) 835-4479 · Email: empireofdaena@gmail.com")}
+    </LegalPage>
+  );
+}
+
+function PrivacyPage({ onNav }) {
+  return (
+    <LegalPage title="Privacy Policy" onNav={onNav}>
+      {para("This Privacy Policy explains how The Empire Moving Co., LLC d/b/a TEMCO collects, uses, and protects your personal information. CCPA rights apply to California residents.")}
+      {section("Information We Collect")}
+      {bullet(["Customer: company name, contact, email, phone, job details, payment info (via Stripe)","Worker: name, phone, email, city, state, skills, job history, SMS responses","Automatically: SMS logs, dispatch activity, usage data"])}
+      {section("How We Use Your Information")}
+      {bullet(["Matching and dispatching workers to jobs","Sending SMS job offers and confirmations (via Twilio)","Processing payments (via Stripe — card data never stored by TEMCO)","Platform operations and compliance"])}
+      {section("Third-Party Services")}
+      {bullet(["Twilio — SMS delivery","Stripe — Payment processing (PCI compliant)","OpenAI — AI worker matching (anonymized job data only)","Railway — Database hosting","Vercel — Web hosting"])}
+      {section("SMS & TCPA Compliance")}
+      {para("By joining TEMCO, you consent to receive automated SMS messages. Message and data rates may apply. Reply STOP to opt out at any time. Reply START to re-enroll.")}
+      {section("Data Sharing")}
+      {para("TEMCO does not sell personal information. Worker contact info is shared with Customers only after payment is confirmed, solely for job coordination.")}
+      {section("California Privacy Rights (CCPA)")}
+      {bullet(["Right to Know — request a summary of data we hold","Right to Delete — request deletion of your data","Right to Opt Out — we do not sell data","Right to Non-Discrimination — we will not discriminate for exercising rights"])}
+      {section("Contact")}
+      {para("The Empire Moving Co., LLC d/b/a TEMCO · (347) 835-4479 · empireofdaena@gmail.com")}
+    </LegalPage>
+  );
+}
+
+function WorkerAgreementPage({ onNav }) {
+  return (
+    <LegalPage title="Worker (Helper) Agreement" onNav={onNav}>
+      {para("By joining the TEMCO network you agree to these terms. You are joining as an independent contractor, not as an employee of The Empire Moving Co., LLC or any Customer.")}
+      {section("Your Status")}
+      {bullet(["You are an independent contractor — not a TEMCO employee","You are responsible for your own taxes including self-employment tax","You are not entitled to employee benefits or workers' compensation through TEMCO","You may work for other companies simultaneously","You retain the right to accept or decline any job offer"])}
+      {section("How TEMCO Works for You")}
+      {bullet(["TEMCO texts you job offers in your area — always your choice to accept","Reply YES to accept, NO to decline","Show up and get paid directly by the Customer on-site","TEMCO never handles your pay — what the Customer pays you is 100% yours"])}
+      {section("Pay & Compensation")}
+      {para("TEMCO does not set, guarantee, or process your pay. Compensation is negotiated with and paid by the Customer on-site. TEMCO's dispatch fee does not come out of your pay in any way.")}
+      {section("Job Responsibilities")}
+      {bullet(["Arrive on time at the specified location","Perform work professionally and safely","Notify TEMCO immediately if you cannot fulfill a confirmed job","Conduct yourself professionally at all times"])}
+      {section("No-Show Policy")}
+      {para("Repeated no-shows without notice may result in reduced dispatch priority or removal from the TEMCO network. Contact (347) 835-4479 immediately if you cannot make a confirmed job.")}
+      {section("SMS Consent (TCPA)")}
+      {para("By joining TEMCO, you expressly consent to receive automated SMS job offers and updates. Message and data rates may apply. Reply STOP to opt out. Reply START to re-enroll.")}
+      {section("Non-Solicitation")}
+      {para("You agree not to solicit direct engagements from TEMCO Customers for 6 months after your last TEMCO job with that Customer without TEMCO's written consent.")}
+      {section("Contact")}
+      {para("The Empire Moving Co., LLC d/b/a TEMCO · (347) 835-4479 · empireofdaena@gmail.com")}
+    </LegalPage>
+  );
+}
+
 // ─── PAYMENT SUCCESS ──────────────────────────────────────────────────────────
 function PaymentSuccess({ onNav }) {
   return (
@@ -1132,6 +1243,9 @@ export default function App() {
     "worker-portal":<WorkerPortal/>,
     "payment-success":<PaymentSuccess onNav={setPage}/>,
     "payment-cancelled":<PaymentCancelled onNav={setPage}/>,
+    "terms":<TermsPage onNav={setPage}/>,
+    "privacy":<PrivacyPage onNav={setPage}/>,
+    "worker-agreement":<WorkerAgreementPage onNav={setPage}/>,
     admin: adminToken
       ? <AdminPortal jobs={jobs} token={adminToken} onLogout={handleAdminLogout}/>
       : <AdminLogin onLogin={setAdminToken}/>,
