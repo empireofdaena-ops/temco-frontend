@@ -45,6 +45,7 @@ function Badge({ status }) {
     "On Job":{bg:"#1A2E0A",color:"#86EFAC"}, Unavailable:{bg:"#2A1A1A",color:C.red},
     Confirmed:{bg:"#163B2A",color:C.green}, "In Progress":{bg:"#1A2500",color:C.amber},
     Completed:{bg:"#1A1A2E",color:C.muted}, Active:{bg:"#163B2A",color:C.green}, active:{bg:"#163B2A",color:C.green},
+    Cancelled:{bg:"#2A1A1A",color:C.red}, Dispatching:{bg:"#1A2500",color:C.amber},
   };
   const s = map[status] || {bg:"#222",color:"#aaa"};
   return <span style={{background:s.bg,color:s.color,padding:"2px 10px",borderRadius:20,fontSize:10,fontWeight:800,letterSpacing:"0.06em",textTransform:"uppercase"}}>{status}</span>;
@@ -893,6 +894,29 @@ function AdminPortal({ token, onLogout }) {
     }
   };
 
+  const handleCancelJob = async (jobId) => {
+    if (!window.confirm("Cancel this job? This cannot be undone.")) return;
+    setActionLoading(prev => ({...prev, [jobId]: true}));
+    try {
+      const res = await fetch(`${API_BASE}/api/jobs/${jobId}/status`, {
+        method: "PATCH",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Cancelled" })
+      });
+      if (res.ok) {
+        setLiveJobs(prev => prev.map(j => j.id === jobId ? {...j, status: "Cancelled"} : j));
+        setActionResults(prev => ({...prev, [jobId]: "✓ Job cancelled."}));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setActionResults(prev => ({...prev, [jobId]: `Error: ${data.error || "Could not cancel job"}`}));
+      }
+    } catch(e) {
+      setActionResults(prev => ({...prev, [jobId]: "Could not reach server"}));
+    } finally {
+      setActionLoading(prev => ({...prev, [jobId]: false}));
+    }
+  };
+
   const handleNoShow = async (jobId, workerId, workerName) => {
     if (!window.confirm(`Mark ${workerName} as a no-show? This will reduce their dispatch priority.`)) return;
     try {
@@ -1162,6 +1186,11 @@ function AdminPortal({ token, onLogout }) {
                     <button onClick={()=>handleRedispatch(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.blue,color:"white",border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
                       🔄 Re-Dispatch More Workers
                     </button>
+                    {j.status!=="Cancelled" && j.status!=="Completed" && (
+                      <button onClick={()=>handleCancelJob(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:"transparent",color:C.red,border:`1px solid ${C.red}66`,padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
+                        ✕ Cancel Job
+                      </button>
+                    )}
                   </div>
 
                   {/* Action result */}
