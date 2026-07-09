@@ -180,7 +180,7 @@ function PublicHome({ onNav, workerCount, stateCount }) {
 }
 
 // ─── REQUEST FORM ─────────────────────────────────────────────────────────────
-function RequestForm({ onNav, addJob, states }) {
+function RequestForm({ onNav, onAuth, states }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({company:"",contact:"",phone:"",email:"",password:"",location:"",state:"",zip:"",date:"",time:"",crew:"4",type:"Load/Unload",duration:"4",notes:""});
   const [submitted, setSubmitted] = useState(false);
@@ -241,12 +241,14 @@ function RequestForm({ onNav, addJob, states }) {
           return;
         }
         token = (await loginRes.json()).token;
+        onAuth(token);
       } else if (!registerRes.ok) {
         setSubmitError("Could not create your account. Please check your details and try again.");
         setSubmitting(false);
         return;
       } else {
         token = (await registerRes.json()).token;
+        onAuth(token);
       }
 
       const jobRes = await fetch(`${API_BASE}/api/jobs`, {
@@ -493,24 +495,144 @@ function WorkerSignup({ states }) {
   );
 }
 
+// ─── CUSTOMER LOGIN GATE ──────────────────────────────────────────────────────
+function CustomerLogin({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
+
+  const submit = async () => {
+    if (!email.trim() || !pw.trim()) { setError("Enter your email and password."); return; }
+    setChecking(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: pw })
+      });
+      if (res.status === 401 || res.status === 403) {
+        setError("Incorrect email or password.");
+        setChecking(false);
+        return;
+      }
+      if (!res.ok) {
+        setError("Could not reach the server. Check your connection and try again.");
+        setChecking(false);
+        return;
+      }
+      const data = await res.json();
+      onLogin(data.token);
+    } catch (e) {
+      setError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div style={{minHeight:"60vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 20px"}}>
+      <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:14,padding:36,maxWidth:380,width:"100%"}}>
+        <div style={{fontSize:13,color:C.amber,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Customer Portal</div>
+        <h2 style={{fontSize:22,fontWeight:800,color:C.chalk,margin:"0 0 18px"}}>Log In</h2>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <input
+            type="email"
+            style={field}
+            value={email}
+            onChange={e=>setEmail(e.target.value)}
+            onKeyDown={e=>e.key==="Enter" && submit()}
+            placeholder="you@company.com"
+            autoFocus
+          />
+          <input
+            type="password"
+            style={field}
+            value={pw}
+            onChange={e=>setPw(e.target.value)}
+            onKeyDown={e=>e.key==="Enter" && submit()}
+            placeholder="Password"
+          />
+        </div>
+        {error && <div style={{color:C.red,fontSize:12,marginTop:8}}>{error}</div>}
+        <button onClick={submit} disabled={checking} style={{...btn(),width:"100%",marginTop:16,opacity:checking?0.6:1}}>
+          {checking ? "Checking..." : "Log In →"}
+        </button>
+        <div style={{fontSize:12,color:C.muted,marginTop:14,textAlign:"center"}}>
+          No account yet? Submit a job request to create one automatically.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── CUSTOMER PORTAL ──────────────────────────────────────────────────────────
-function CustomerPortal({ jobs }) {
+function CustomerPortal({ token, onLogout }) {
   const [tab, setTab] = useState("jobs");
-  const myJobs = jobs.slice(0,4);
-  const totalSpend = myJobs.reduce((a,j)=>a+j.fee,0);
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadJobs() {
+      setLoading(true);
+      setLoadError("");
+      try {
+        const res = await fetch(`${API_BASE}/api/jobs`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error(`Server responded ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) setJobs(data.jobs || []);
+      } catch (e) {
+        if (!cancelled) setLoadError("Could not load your jobs. " + e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    loadJobs();
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const normalizedJobs = useMemo(() => jobs.map(j => ({
+    id: j.job_number || j.id,
+    location: [j.location_city, j.location_state].filter(Boolean).join(", "),
+    date: j.job_date ? j.job_date.slice(0,10) : '—',
+    crew: j.crew_size,
+    type: j.work_type,
+    status: j.status,
+    fee: parseFloat(j.dispatch_fee) || 0,
+  })), [jobs]);
+
+  const totalSpend = normalizedJobs.reduce((a,j)=>a+j.fee,0);
 
   return (
     <div style={{padding:"30px"}}>
-      <SectionTitle title="Customer Portal" sub="Track jobs, manage crews, and view invoices." />
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,flexWrap:"wrap",gap:12}}>
+        <SectionTitle title="Customer Portal" sub="Track jobs, manage crews, and view invoices." />
+        <button onClick={onLogout} style={{...btn("ghost"),padding:"6px 14px",fontSize:12}}>Log Out</button>
+      </div>
       <Tabs tabs={[["jobs","My Jobs"],["billing","Invoices"],["request","New Request"]]} active={tab} onChange={setTab}/>
 
+      {loadError && (
+        <div style={{background:"#2A1A1A",border:`1px solid ${C.red}55`,borderRadius:10,padding:"12px 16px",marginBottom:20,color:C.red,fontSize:13}}>
+          {loadError}
+        </div>
+      )}
+
+      {loading ? <Spinner/> : (
+      <>
       {tab==="jobs" && (
         <>
           <div style={{display:"flex",gap:14,marginBottom:24,flexWrap:"wrap"}}>
-            <StatCard label="Total Jobs" value={myJobs.length} />
-            <StatCard label="Active" value={myJobs.filter(j=>j.status==="In Progress"||j.status==="Confirmed").length} color={C.amber}/>
+            <StatCard label="Total Jobs" value={normalizedJobs.length} />
+            <StatCard label="Active" value={normalizedJobs.filter(j=>j.status==="In Progress"||j.status==="Confirmed"||j.status==="Pending").length} color={C.amber}/>
             <StatCard label="Total Spent" value={`$${totalSpend.toLocaleString()}`} color={C.green}/>
           </div>
+          {normalizedJobs.length===0 && <div style={{padding:30,color:C.muted,fontSize:13,textAlign:"center"}}>No jobs yet. Submit a request to get started.</div>}
+          {normalizedJobs.length>0 && (
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
               <thead><tr style={{borderBottom:`1px solid ${C.border}`}}>
@@ -518,7 +640,7 @@ function CustomerPortal({ jobs }) {
                   <th key={h} style={{textAlign:"left",padding:"9px 12px",color:C.muted,fontWeight:700,fontSize:10,textTransform:"uppercase"}}>{h}</th>
                 ))}
               </tr></thead>
-              <tbody>{myJobs.map(j=>(
+              <tbody>{normalizedJobs.map(j=>(
                 <tr key={j.id} style={{borderBottom:`1px solid ${C.border}`}}>
                   <td style={{padding:"11px 12px",color:C.amber,fontWeight:700}}>{j.id}</td>
                   <td style={{padding:"11px 12px",color:C.chalk}}>{j.location}</td>
@@ -531,12 +653,14 @@ function CustomerPortal({ jobs }) {
               ))}</tbody>
             </table>
           </div>
+          )}
         </>
       )}
 
       {tab==="billing" && (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {myJobs.map(j=>(
+          {normalizedJobs.length===0 && <div style={{padding:30,color:C.muted,fontSize:13,textAlign:"center"}}>No invoices yet.</div>}
+          {normalizedJobs.map(j=>(
             <div key={j.id} style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:10,padding:"15px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
               <div>
                 <div style={{fontWeight:700,color:C.chalk}}>{j.id} — {j.location}</div>
@@ -544,15 +668,16 @@ function CustomerPortal({ jobs }) {
               </div>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
                 <span style={{fontSize:18,fontWeight:800,color:C.amber}}>${j.fee}</span>
-                <Badge status={j.status==="Completed"?"Completed":"Confirmed"}/>
-                <button style={{...btn("secondary"),fontSize:11,padding:"5px 12px"}}>Receipt</button>
+                <Badge status={j.status}/>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {tab==="request" && <RequestForm onNav={()=>setTab("jobs")} addJob={()=>{}} states={FALLBACK_STATES} />}
+      {tab==="request" && <RequestForm onNav={()=>setTab("jobs")} onAuth={()=>{}} states={FALLBACK_STATES} />}
+      </>
+      )}
     </div>
   );
 }
@@ -1334,8 +1459,8 @@ function PaymentCancelled({ onNav }) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState("home");
-  const [jobs, setJobs] = useState(INITIAL_JOBS);
   const [adminToken, setAdminToken] = useState(null);
+  const [customerToken, setCustomerToken] = useState(() => localStorage.getItem('temco_customer_token'));
 
   // Detect Stripe redirect on mount
   useEffect(() => {
@@ -1345,11 +1470,20 @@ export default function App() {
     else if (path.includes("payment-cancelled")) setPage("payment-cancelled");
   }, []);
 
-  const addJob = (job) => setJobs(prev => [job, ...prev]);
-
   const handleAdminLogout = () => {
     setAdminToken(null);
     setPage("home");
+  };
+
+  const handleCustomerLogout = () => {
+    localStorage.removeItem('temco_customer_token');
+    setCustomerToken(null);
+    setPage("home");
+  };
+
+  const handleCustomerAuth = (t) => {
+    localStorage.setItem('temco_customer_token', t);
+    setCustomerToken(t);
   };
 
   const NAV_LEFT = [
@@ -1365,9 +1499,11 @@ export default function App() {
 
   const pages = {
     home:<PublicHome onNav={setPage} workerCount={546} stateCount={49}/>,
-    request:<RequestForm onNav={setPage} addJob={addJob} states={FALLBACK_STATES}/>,
+    request:<RequestForm onNav={setPage} onAuth={handleCustomerAuth} states={FALLBACK_STATES}/>,
     "worker-signup":<WorkerSignup states={FALLBACK_STATES}/>,
-    "customer-portal":<CustomerPortal jobs={jobs}/>,
+    "customer-portal": customerToken
+      ? <CustomerPortal token={customerToken} onLogout={handleCustomerLogout}/>
+      : <CustomerLogin onLogin={handleCustomerAuth}/>,
     "worker-portal":<WorkerPortal/>,
     "payment-success":<PaymentSuccess onNav={setPage}/>,
     "payment-cancelled":<PaymentCancelled onNav={setPage}/>,
@@ -1375,7 +1511,7 @@ export default function App() {
     "privacy":<PrivacyPage onNav={setPage}/>,
     "worker-agreement":<WorkerAgreementPage onNav={setPage}/>,
     admin: adminToken
-      ? <AdminPortal jobs={jobs} token={adminToken} onLogout={handleAdminLogout}/>
+      ? <AdminPortal token={adminToken} onLogout={handleAdminLogout}/>
       : <AdminLogin onLogin={setAdminToken}/>,
   };
 
