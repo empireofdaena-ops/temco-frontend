@@ -683,65 +683,251 @@ function CustomerPortal({ token, onLogout }) {
   );
 }
 
+// ─── WORKER LOGIN GATE (phone + SMS one-time code) ───────────────────────────
+function WorkerLogin({ onLogin }) {
+  const [step, setStep] = useState(1); // 1 = enter phone, 2 = enter code
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sentMsg, setSentMsg] = useState("");
+
+  const requestCode = async () => {
+    if (!phone.trim()) { setError("Enter your phone number."); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/worker/request-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Could not send code. Please try again.");
+        setLoading(false);
+        return;
+      }
+      setSentMsg(data.message || "Code sent.");
+      setStep(2);
+    } catch (e) {
+      setError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyCode = async () => {
+    if (!code.trim()) { setError("Enter the code we texted you."); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/worker/verify-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, code })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Incorrect or expired code.");
+        setLoading(false);
+        return;
+      }
+      onLogin(data.token);
+    } catch (e) {
+      setError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{minHeight:"60vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 20px"}}>
+      <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:14,padding:36,maxWidth:380,width:"100%"}}>
+        <div style={{fontSize:13,color:C.amber,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Worker Portal</div>
+        <h2 style={{fontSize:22,fontWeight:800,color:C.chalk,margin:"0 0 18px"}}>{step===1 ? "Enter Your Phone" : "Enter Your Code"}</h2>
+
+        {step===1 ? (
+          <>
+            <input
+              type="tel"
+              style={field}
+              value={phone}
+              onChange={e=>setPhone(e.target.value)}
+              onKeyDown={e=>e.key==="Enter" && requestCode()}
+              placeholder="(214) 555-0000"
+              autoFocus
+            />
+            {error && <div style={{color:C.red,fontSize:12,marginTop:8}}>{error}</div>}
+            <button onClick={requestCode} disabled={loading} style={{...btn(),width:"100%",marginTop:16,opacity:loading?0.6:1}}>
+              {loading ? "Sending..." : "Send Code →"}
+            </button>
+            <div style={{fontSize:12,color:C.muted,marginTop:14,textAlign:"center"}}>
+              Must be the phone number you applied with.
+            </div>
+          </>
+        ) : (
+          <>
+            {sentMsg && <div style={{color:C.green,fontSize:12,marginBottom:12}}>{sentMsg}</div>}
+            <input
+              type="text"
+              inputMode="numeric"
+              style={field}
+              value={code}
+              onChange={e=>setCode(e.target.value)}
+              onKeyDown={e=>e.key==="Enter" && verifyCode()}
+              placeholder="6-digit code"
+              autoFocus
+            />
+            {error && <div style={{color:C.red,fontSize:12,marginTop:8}}>{error}</div>}
+            <button onClick={verifyCode} disabled={loading} style={{...btn(),width:"100%",marginTop:16,opacity:loading?0.6:1}}>
+              {loading ? "Verifying..." : "Log In →"}
+            </button>
+            <button onClick={()=>{setStep(1);setCode("");setError("");}} style={{...btn("ghost"),width:"100%",marginTop:10}}>
+              ← Use a different number
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── WORKER PORTAL ────────────────────────────────────────────────────────────
-function WorkerPortal() {
-  const [avail, setAvail] = useState(true);
-  const [responded, setResponded] = useState(null);
+function WorkerPortal({ token, onLogout }) {
+  const [worker, setWorker] = useState(null);
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [availLoading, setAvailLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadData() {
+      setLoading(true);
+      setLoadError("");
+      try {
+        const [profileRes, jobsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/workers/me`, { headers: { "Authorization": `Bearer ${token}` } }),
+          fetch(`${API_BASE}/api/workers/me/jobs`, { headers: { "Authorization": `Bearer ${token}` } })
+        ]);
+        if (!profileRes.ok) throw new Error(`Server responded ${profileRes.status}`);
+        const profileData = await profileRes.json();
+        const jobsData = jobsRes.ok ? await jobsRes.json() : { jobs: [] };
+        if (!cancelled) {
+          setWorker(profileData.worker);
+          setJobs(jobsData.jobs || []);
+        }
+      } catch (e) {
+        if (!cancelled) setLoadError("Could not load your profile. " + e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    loadData();
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const toggleAvailability = async () => {
+    if (!worker) return;
+    const newStatus = worker.status === "active" ? "Unavailable" : "active";
+    setAvailLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/workers/me/availability`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        setWorker(prev => ({ ...prev, status: newStatus }));
+      }
+    } catch (e) {
+      console.error("Availability update failed", e);
+    } finally {
+      setAvailLoading(false);
+    }
+  };
+
+  const normalizedJobs = useMemo(() => jobs.map(j => ({
+    id: j.job_number,
+    location: [j.location_city, j.location_state].filter(Boolean).join(", "),
+    date: j.job_date ? j.job_date.slice(0,10) : '—',
+    type: j.work_type,
+    role: j.role,
+    response: j.response,
+    confirmed: j.confirmed,
+    noShow: j.no_show,
+    jobStatus: j.job_status,
+  })), [jobs]);
+
+  const isAvailable = worker?.status === "active";
 
   return (
     <div style={{padding:"30px"}}>
-      <SectionTitle title="Worker Portal" sub="Manage your profile, availability, and job offers." />
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,flexWrap:"wrap",gap:12}}>
+        <SectionTitle title="Worker Portal" sub="Manage your profile, availability, and job offers." />
+        <button onClick={onLogout} style={{...btn("ghost"),padding:"6px 14px",fontSize:12}}>Log Out</button>
+      </div>
+
+      {loadError && (
+        <div style={{background:"#2A1A1A",border:`1px solid ${C.red}55`,borderRadius:10,padding:"12px 16px",marginBottom:20,color:C.red,fontSize:13}}>
+          {loadError}
+        </div>
+      )}
+
+      {loading ? <Spinner/> : worker && (
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:22,flexWrap:"wrap"}}>
         {/* Profile card */}
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22}}>
             <div style={{width:54,height:54,borderRadius:"50%",background:C.amber,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:900,color:C.navy,marginBottom:14}}>
-              MJ
+              {worker.name ? worker.name.split(" ").map(n=>n[0]).slice(0,2).join("").toUpperCase() : "?"}
             </div>
-            <div style={{fontWeight:800,fontSize:17,color:C.chalk}}>Sample Worker</div>
-            <div style={{fontSize:13,color:C.muted,marginTop:2}}>Log in via SMS link to see your real profile</div>
+            <div style={{fontWeight:800,fontSize:17,color:C.chalk}}>{worker.name}</div>
+            <div style={{fontSize:13,color:C.muted,marginTop:2}}>{worker.city}{worker.city && worker.state ? ", " : ""}{worker.state}</div>
+            {worker.skills?.length>0 && (
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:12}}>
+                {worker.skills.slice(0,4).map(s=>(
+                  <span key={s} style={{fontSize:10,padding:"3px 9px",borderRadius:20,background:C.navyLight,color:C.muted}}>{s}</span>
+                ))}
+              </div>
+            )}
           </div>
           {/* Availability toggle */}
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:18}}>
             <div style={{fontSize:11,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:12}}>Availability</div>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <span style={{color:avail?C.green:C.red,fontWeight:700,fontSize:14}}>{avail?"Available":"Unavailable"}</span>
-              <div onClick={()=>setAvail(a=>!a)} style={{width:44,height:24,borderRadius:12,cursor:"pointer",background:avail?C.green:C.border,position:"relative",transition:"background 0.2s"}}>
-                <div style={{width:18,height:18,borderRadius:"50%",background:"white",position:"absolute",top:3,left:avail?23:3,transition:"left 0.2s"}}/>
+              <span style={{color:isAvailable?C.green:C.red,fontWeight:700,fontSize:14}}>{isAvailable?"Available":"Unavailable"}</span>
+              <div onClick={availLoading?undefined:toggleAvailability} style={{width:44,height:24,borderRadius:12,cursor:availLoading?"wait":"pointer",background:isAvailable?C.green:C.border,position:"relative",transition:"background 0.2s",opacity:availLoading?0.6:1}}>
+                <div style={{width:18,height:18,borderRadius:"50%",background:"white",position:"absolute",top:3,left:isAvailable?23:3,transition:"left 0.2s"}}/>
               </div>
             </div>
           </div>
         </div>
 
-        {/* SMS job offer preview */}
+        {/* Job history */}
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22}}>
-            <div style={{fontWeight:700,color:C.chalk,marginBottom:4}}>Incoming Job Offer</div>
-            <div style={{fontSize:12,color:C.muted,marginBottom:16}}>This is how TEMCO dispatch texts will appear on your phone</div>
-            <div style={{background:"#0D1B2A",border:`1px solid ${C.border}`,borderRadius:12,padding:20,fontFamily:"monospace",fontSize:13,color:"#CBD5E1",lineHeight:2}}>
-              <div style={{color:C.muted,fontSize:11,marginBottom:8}}>From: TEMCO Dispatch · {new Date().toLocaleTimeString()}</div>
-              🚛 Job Offer — TEMCO Dispatch<br/>
-              ─────────────────────<br/>
-              📍 Dallas, TX 75201<br/>
-              📅 Jun 12 @ 8:00 AM<br/>
-              👥 4 Loaders needed<br/>
-              ⏱ Est. 4 hours<br/>
-              💵 Pay: $150–200 (cash on-site)<br/>
-              ─────────────────────<br/>
-              Reply YES to confirm<br/>
-              Reply NO to decline<br/>
-              Reply STOP to opt out
-            </div>
-            {!responded ? (
-              <div style={{display:"flex",gap:10,marginTop:16}}>
-                <button onClick={()=>setResponded("yes")} style={{flex:1,background:C.green,color:"white",border:"none",padding:"11px",borderRadius:8,fontWeight:800,cursor:"pointer",fontSize:14}}>✓ YES — Accept Job</button>
-                <button onClick={()=>setResponded("no")} style={{flex:1,background:C.navyLight,color:C.muted,border:`1px solid ${C.border}`,padding:"11px",borderRadius:8,fontWeight:700,cursor:"pointer",fontSize:14}}>✗ NO — Decline</button>
+            <div style={{fontWeight:700,color:C.chalk,marginBottom:16}}>Your Job Offers</div>
+            {normalizedJobs.length===0 ? (
+              <div style={{color:C.muted,fontSize:13,textAlign:"center",padding:"20px 0"}}>
+                No job offers yet. You'll get a text here when TEMCO has work matching your area and skills.
               </div>
-            ) : (
-              <div style={{marginTop:16,padding:14,borderRadius:8,background:responded==="yes"?"#163B2A":"#2A1A1A",color:responded==="yes"?C.green:C.red,fontWeight:700,textAlign:"center"}}>
-                {responded==="yes"?"✓ Confirmed! You'll receive full job details shortly.":"✗ Declined. We'll send you the next available job."}
+            ) : normalizedJobs.map(j=>(
+              <div key={j.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:`1px solid ${C.border}`,flexWrap:"wrap",gap:8}}>
+                <div>
+                  <div style={{color:C.chalk,fontWeight:600,fontSize:13}}>{j.location} — {j.type}</div>
+                  <div style={{fontSize:12,color:C.muted}}>{j.date}{j.role ? ` · ${j.role}` : ""}</div>
+                </div>
+                <div style={{
+                  fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:20,
+                  background:j.noShow?"#2A1A1A":j.response==='YES'?"#163B2A":j.response==='NO'?"#2A1A1A":"#1A1A2E",
+                  color:j.noShow?C.red:j.response==='YES'?C.green:j.response==='NO'?C.red:C.muted
+                }}>
+                  {j.noShow?"NO-SHOW":j.response||"Pending"}
+                </div>
               </div>
-            )}
+            ))}
           </div>
 
           {/* How it works for workers */}
@@ -763,6 +949,7 @@ function WorkerPortal() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -1500,6 +1687,7 @@ export default function App() {
   const [page, setPage] = useState(() => pageForPath(window.location.pathname));
   const [adminToken, setAdminToken] = useState(null);
   const [customerToken, setCustomerToken] = useState(() => localStorage.getItem('temco_customer_token'));
+  const [workerToken, setWorkerToken] = useState(() => localStorage.getItem('temco_worker_token'));
 
   // Real URL navigation: updates the address bar (so links are shareable/bookmarkable)
   // and keeps browser back/forward working correctly.
@@ -1535,6 +1723,17 @@ export default function App() {
     setCustomerToken(t);
   };
 
+  const handleWorkerLogout = () => {
+    localStorage.removeItem('temco_worker_token');
+    setWorkerToken(null);
+    navigate("home");
+  };
+
+  const handleWorkerAuth = (t) => {
+    localStorage.setItem('temco_worker_token', t);
+    setWorkerToken(t);
+  };
+
   const NAV_LEFT = [
     {id:"home",label:"Home"},
     {id:"request",label:"Request Labor"},
@@ -1553,7 +1752,9 @@ export default function App() {
     "customer-portal": customerToken
       ? <CustomerPortal token={customerToken} onLogout={handleCustomerLogout}/>
       : <CustomerLogin onLogin={handleCustomerAuth}/>,
-    "worker-portal":<WorkerPortal/>,
+    "worker-portal": workerToken
+      ? <WorkerPortal token={workerToken} onLogout={handleWorkerLogout}/>
+      : <WorkerLogin onLogin={handleWorkerAuth}/>,
     "payment-success":<PaymentSuccess onNav={navigate}/>,
     "payment-cancelled":<PaymentCancelled onNav={navigate}/>,
     "terms":<TermsPage onNav={navigate}/>,
