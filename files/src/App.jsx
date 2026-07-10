@@ -1486,28 +1486,48 @@ function PaymentCancelled({ onNav }) {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
+const KNOWN_ROUTES = ["request","worker-signup","customer-portal","worker-portal","admin","terms","privacy","worker-agreement","payment-success","payment-cancelled"];
+
+function pageForPath(pathname) {
+  const seg = pathname.replace(/\/+$/,"").split("/").filter(Boolean)[0] || "";
+  return KNOWN_ROUTES.includes(seg) ? seg : "home";
+}
+function pathForPage(page) {
+  return page === "home" ? "/" : `/${page}`;
+}
+
 export default function App() {
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState(() => pageForPath(window.location.pathname));
   const [adminToken, setAdminToken] = useState(null);
   const [customerToken, setCustomerToken] = useState(() => localStorage.getItem('temco_customer_token'));
 
-  // Detect Stripe redirect on mount
+  // Real URL navigation: updates the address bar (so links are shareable/bookmarkable)
+  // and keeps browser back/forward working correctly.
+  const navigate = (newPage) => {
+    const path = pathForPage(newPage);
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+    }
+    setPage(newPage);
+  };
+
+  // Sync page state with the actual URL on load and on back/forward navigation
   useEffect(() => {
-    const path = window.location.pathname;
-    const params = new URLSearchParams(window.location.search);
-    if (path.includes("payment-success")) setPage("payment-success");
-    else if (path.includes("payment-cancelled")) setPage("payment-cancelled");
+    setPage(pageForPath(window.location.pathname));
+    const onPopState = () => setPage(pageForPath(window.location.pathname));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   const handleAdminLogout = () => {
     setAdminToken(null);
-    setPage("home");
+    navigate("home");
   };
 
   const handleCustomerLogout = () => {
     localStorage.removeItem('temco_customer_token');
     setCustomerToken(null);
-    setPage("home");
+    navigate("home");
   };
 
   const handleCustomerAuth = (t) => {
@@ -1527,18 +1547,18 @@ export default function App() {
   ];
 
   const pages = {
-    home:<PublicHome onNav={setPage} workerCount={546} stateCount={49}/>,
-    request:<RequestForm onNav={setPage} onAuth={handleCustomerAuth} states={FALLBACK_STATES}/>,
+    home:<PublicHome onNav={navigate} workerCount={546} stateCount={49}/>,
+    request:<RequestForm onNav={navigate} onAuth={handleCustomerAuth} states={FALLBACK_STATES}/>,
     "worker-signup":<WorkerSignup states={FALLBACK_STATES}/>,
     "customer-portal": customerToken
       ? <CustomerPortal token={customerToken} onLogout={handleCustomerLogout}/>
       : <CustomerLogin onLogin={handleCustomerAuth}/>,
     "worker-portal":<WorkerPortal/>,
-    "payment-success":<PaymentSuccess onNav={setPage}/>,
-    "payment-cancelled":<PaymentCancelled onNav={setPage}/>,
-    "terms":<TermsPage onNav={setPage}/>,
-    "privacy":<PrivacyPage onNav={setPage}/>,
-    "worker-agreement":<WorkerAgreementPage onNav={setPage}/>,
+    "payment-success":<PaymentSuccess onNav={navigate}/>,
+    "payment-cancelled":<PaymentCancelled onNav={navigate}/>,
+    "terms":<TermsPage onNav={navigate}/>,
+    "privacy":<PrivacyPage onNav={navigate}/>,
+    "worker-agreement":<WorkerAgreementPage onNav={navigate}/>,
     admin: adminToken
       ? <AdminPortal token={adminToken} onLogout={handleAdminLogout}/>
       : <AdminLogin onLogin={setAdminToken}/>,
@@ -1551,7 +1571,7 @@ export default function App() {
       {/* Nav */}
       <nav style={{background:C.navy,borderBottom:`1px solid ${C.border}`,padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,position:"sticky",top:0,zIndex:100,flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:16}}>
-          <div onClick={()=>setPage("home")} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
+          <div onClick={()=>navigate("home")} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
             <div style={{background:C.amber,width:30,height:30,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:C.navy}}>T</div>
             <div>
               <div style={{fontWeight:900,fontSize:14,letterSpacing:"0.08em",color:C.chalk,lineHeight:1}}>TEMCO</div>
@@ -1560,13 +1580,13 @@ export default function App() {
           </div>
           <div style={{display:"flex",gap:3}}>
             {NAV_LEFT.map(n=>(
-              <button key={n.id} onClick={()=>setPage(n.id)} style={{background:page===n.id?C.navyMid:"transparent",color:page===n.id?C.amber:C.muted,border:page===n.id?`1px solid ${C.border}`:"1px solid transparent",padding:"5px 11px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>{n.label}</button>
+              <button key={n.id} onClick={()=>navigate(n.id)} style={{background:page===n.id?C.navyMid:"transparent",color:page===n.id?C.amber:C.muted,border:page===n.id?`1px solid ${C.border}`:"1px solid transparent",padding:"5px 11px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>{n.label}</button>
             ))}
           </div>
         </div>
         <div style={{display:"flex",gap:3}}>
           {NAV_RIGHT.map(n=>(
-            <button key={n.id} onClick={()=>setPage(n.id)} style={{background:page===n.id?C.navyMid:"transparent",color:page===n.id?C.amber:C.muted,border:page===n.id?`1px solid ${C.border}`:"1px solid transparent",padding:"5px 11px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>{n.label}</button>
+            <button key={n.id} onClick={()=>navigate(n.id)} style={{background:page===n.id?C.navyMid:"transparent",color:page===n.id?C.amber:C.muted,border:page===n.id?`1px solid ${C.border}`:"1px solid transparent",padding:"5px 11px",borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer"}}>{n.label}</button>
           ))}
         </div>
       </nav>
