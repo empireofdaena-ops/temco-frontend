@@ -1601,8 +1601,10 @@ function PrivacyPage({ onNav }) {
       {bullet(["Matching and dispatching workers to jobs","Sending SMS job offers and confirmations (via Twilio)","Processing payments (via Stripe — card data never stored by TEMCO)","Platform operations and compliance"])}
       {section("Third-Party Services")}
       {bullet(["Twilio — SMS delivery","Stripe — Payment processing (PCI compliant)","OpenAI — AI worker matching (anonymized job data only)","Railway — Database hosting","Vercel — Web hosting"])}
+      {para("These service providers process data solely to deliver the services described above (SMS delivery, payment processing, AI matching, hosting) and are contractually and technically restricted from using your information for their own marketing purposes or sharing it further.")}
       {section("SMS & TCPA Compliance")}
       {para("By joining TEMCO, you consent to receive automated SMS messages. Message and data rates may apply. Reply STOP to opt out at any time. Reply START to re-enroll.")}
+      {para("No mobile information collected for SMS/text messaging purposes will be shared with third parties or affiliates for marketing or promotional purposes. Your phone number and SMS opt-in status are used solely to send job dispatch offers, confirmations, and operational updates related to TEMCO's labor dispatch service. This information is not sold, rented, or shared with any third party for their own marketing purposes.")}
       {section("Data Sharing")}
       {para("TEMCO does not sell personal information. Worker contact info is shared with Customers only after payment is confirmed, solely for job coordination.")}
       {section("California Privacy Rights (CCPA)")}
