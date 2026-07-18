@@ -155,7 +155,7 @@ function PublicHome({ onNav, workerCount, stateCount }) {
       <div style={{background:C.navyMid,padding:"56px 40px",borderTop:`1px solid ${C.border}`,borderBottom:`1px solid ${C.border}`}}>
         <div style={{maxWidth:560,margin:"0 auto",textAlign:"center"}}>
           <h2 style={{fontSize:26,fontWeight:800,color:C.chalk,margin:"0 0 8px"}}>Simple, Transparent Pricing</h2>
-          <p style={{color:C.muted,marginBottom:32}}>One flat dispatch fee per worker. You pay workers directly on-site.</p>
+          <p style={{color:C.muted,marginBottom:32}}>Dispatch fee scales with job type, crew size, and timing. You pay workers directly on-site.</p>
           <div style={{background:C.navy,border:`1px solid ${C.border}`,borderRadius:14,padding:"32px 40px",display:"inline-block"}}>
             <div style={{fontSize:48,fontWeight:900,color:C.amber}}>$75–$125</div>
             <div style={{color:C.muted,fontSize:14,marginTop:4}}>per worker dispatched</div>
@@ -1019,6 +1019,7 @@ function AdminPortal({ token, onLogout }) {
   const [stateFilter, setStateFilter] = useState("");
   const [skillFilter, setSkillFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [partnerSearch, setPartnerSearch] = useState("");
 
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1212,6 +1213,43 @@ function AdminPortal({ token, onLogout }) {
 
   const totalFees = normalizedJobs.reduce((a,j)=>a+(j.fee||0),0);
 
+  // ── PARTNERS/CONTACTS: derived from existing job/customer data (no new API call needed) ──
+  const partners = useMemo(() => {
+    const map = {};
+    liveJobs.forEach(j => {
+      const key = j.customer_email || j.company || j.contact_name;
+      if (!key) return;
+      if (!map[key]) {
+        map[key] = {
+          key,
+          company: j.company || "—",
+          contact_name: j.contact_name || "—",
+          email: j.customer_email || "—",
+          jobCount: 0,
+          totalRevenue: 0,
+          lastActive: null,
+        };
+      }
+      map[key].jobCount += 1;
+      map[key].totalRevenue += parseFloat(j.dispatch_fee) || 0;
+      const jobDate = j.job_date ? new Date(j.job_date) : (j.created_at ? new Date(j.created_at) : null);
+      if (jobDate && (!map[key].lastActive || jobDate > map[key].lastActive)) {
+        map[key].lastActive = jobDate;
+      }
+    });
+    return Object.values(map).sort((a,b) => (b.lastActive||0) - (a.lastActive||0));
+  }, [liveJobs]);
+
+  const filteredPartners = useMemo(() => {
+    if (!partnerSearch) return partners;
+    const q = partnerSearch.toLowerCase();
+    return partners.filter(p =>
+      p.company.toLowerCase().includes(q) ||
+      p.contact_name.toLowerCase().includes(q) ||
+      p.email.toLowerCase().includes(q)
+    );
+  }, [partners, partnerSearch]);
+
   return (
     <div style={{padding:"28px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,flexWrap:"wrap",gap:12}}>
@@ -1231,7 +1269,7 @@ function AdminPortal({ token, onLogout }) {
         </div>
       )}
 
-      <Tabs tabs={[["overview","Overview"],["workers","Workers"],["jobs","All Jobs"],["dispatch","Dispatch Sim"]]} active={tab} onChange={setTab}/>
+      <Tabs tabs={[["overview","Overview"],["workers","Workers"],["jobs","All Jobs"],["partners","Partners"],["dispatch","Dispatch Sim"]]} active={tab} onChange={setTab}/>
 
       {(loading || jobsLoading) ? <Spinner/> : (
       <>
@@ -1429,6 +1467,43 @@ function AdminPortal({ token, onLogout }) {
         </div>
       )}
 
+      {/* ── PARTNERS / CONTACTS ── */}
+      {tab==="partners" && (
+        <div>
+          <div style={{display:"flex",gap:14,marginBottom:20,flexWrap:"wrap"}}>
+            <StatCard label="Total Partners" value={partners.length} color={C.green}/>
+            <StatCard label="Repeat Customers" value={partners.filter(p=>p.jobCount>1).length} color={C.amber}/>
+            <StatCard label="Total Revenue" value={`$${partners.reduce((a,p)=>a+p.totalRevenue,0).toLocaleString()}`} color={C.chalk}/>
+          </div>
+
+          <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.6}}>
+            This list is built automatically from customers who've submitted job requests — no separate signup needed. Use it to follow up, share new services, or explore partnerships.
+          </div>
+
+          <input style={{...field,marginBottom:16,maxWidth:400}} value={partnerSearch} onChange={e=>setPartnerSearch(e.target.value)} placeholder="Search by company, contact, or email..."/>
+
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+              <thead><tr style={{borderBottom:`1px solid ${C.border}`}}>
+                {["Company","Contact","Email","Jobs","Revenue","Last Active"].map(h=>(
+                  <th key={h} style={{textAlign:"left",padding:"9px 12px",color:C.muted,fontWeight:700,fontSize:10,textTransform:"uppercase"}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>{filteredPartners.map(p=>(
+                <tr key={p.key} style={{borderBottom:`1px solid ${C.border}`}}>
+                  <td style={{padding:"11px 12px",color:C.chalk,fontWeight:600}}>{p.company}</td>
+                  <td style={{padding:"11px 12px",color:C.chalk}}>{p.contact_name}</td>
+                  <td style={{padding:"11px 12px",color:C.muted,fontSize:12}}>{p.email}</td>
+                  <td style={{padding:"11px 12px",color:C.chalk}}>{p.jobCount}</td>
+                  <td style={{padding:"11px 12px",color:C.green,fontWeight:700}}>${p.totalRevenue.toLocaleString()}</td>
+                  <td style={{padding:"11px 12px",color:C.muted,fontSize:12}}>{p.lastActive ? p.lastActive.toLocaleDateString() : "—"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            {filteredPartners.length===0 && <div style={{padding:30,color:C.muted,fontSize:13,textAlign:"center"}}>No partners match this search.</div>}
+          </div>
+        </div>
+      )}
 
       {/* ── DISPATCH SIM ── */}
       {tab==="dispatch" && <DispatchSim workers={normalizedWorkers} states={STATES} />}
@@ -1573,7 +1648,7 @@ function TermsPage({ onNav }) {
       {section("1. About TEMCO")}
       {para("TEMCO National Labor Dispatch Network is operated by The Empire Moving Co., LLC, a California limited liability company. TEMCO is a labor dispatch marketplace — a technology platform that connects businesses seeking moving labor with independent workers available in their area. TEMCO is not a moving company, staffing agency, or employer.")}
       {section("2. Dispatch Fee & Payment")}
-      {para("TEMCO charges a flat dispatch fee of $75–$125 per Helper dispatched. This fee is charged via Stripe upon crew confirmation.")}
+      {para("TEMCO charges a dispatch fee of $75–$125 per Helper dispatched, based on job type, crew size, and timing. This fee is charged via Stripe upon crew confirmation.")}
       {para("⚠ The dispatch fee is non-refundable once workers have been contacted and confirmed for your job.")}
       {section("3. Worker Compensation")}
       {para("Helpers are paid directly by the Customer on-site. TEMCO does not process, hold, or distribute worker pay. The dispatch fee is entirely separate from worker compensation.")}
