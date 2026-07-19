@@ -1034,6 +1034,12 @@ function AdminPortal({ token, onLogout }) {
   const [actionLoading, setActionLoading] = useState({});
   const [actionResults, setActionResults] = useState({});
 
+  // ── Worker notes editing state ──
+  const [expandedWorkerId, setExpandedWorkerId] = useState(null);
+  const [workerNotesDraft, setWorkerNotesDraft] = useState({});
+  const [workerNoteSaving, setWorkerNoteSaving] = useState({});
+  const [workerNoteResult, setWorkerNoteResult] = useState({});
+
   const handleExpandJob = async (job) => {
     if (expandedJobId === job.rawId) { setExpandedJobId(null); return; }
     setExpandedJobId(job.rawId);
@@ -1119,6 +1125,30 @@ function AdminPortal({ token, onLogout }) {
     } catch(e) { console.error("No-show update failed", e); }
   };
 
+  // ── Save worker relationship note ──
+  const handleSaveWorkerNote = async (workerId) => {
+    setWorkerNoteSaving(prev => ({...prev, [workerId]: true}));
+    setWorkerNoteResult(prev => ({...prev, [workerId]: ""}));
+    try {
+      const res = await fetch(`${API_BASE}/api/workers/${workerId}/notes`, {
+        method: "PATCH",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: workerNotesDraft[workerId] ?? "" })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setWorkers(prev => prev.map(w => w.id === workerId ? { ...w, notes: data.worker.notes, last_contacted: data.worker.last_contacted } : w));
+        setWorkerNoteResult(prev => ({...prev, [workerId]: "✓ Saved"}));
+      } else {
+        setWorkerNoteResult(prev => ({...prev, [workerId]: `Error: ${data.error}`}));
+      }
+    } catch (e) {
+      setWorkerNoteResult(prev => ({...prev, [workerId]: "Could not reach server"}));
+    } finally {
+      setWorkerNoteSaving(prev => ({...prev, [workerId]: false}));
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     async function loadJobs() {
@@ -1182,6 +1212,8 @@ function AdminPortal({ token, onLogout }) {
     travel: w.travel_radius || w.travel || null,
     bases: w.bases_access ?? w.bases ?? false,
     experience: w.experience || null,
+    notes: w.notes || "",
+    last_contacted: w.last_contacted || null,
   })), [workers]);
 
   const STATES = useMemo(() => [...new Set(normalizedWorkers.map(w => w.state).filter(Boolean))].sort(), [normalizedWorkers]);
@@ -1343,27 +1375,57 @@ function AdminPortal({ token, onLogout }) {
             </select>
           </div>
 
-          <div style={{fontSize:12,color:C.muted,marginBottom:12}}>Showing {filteredWorkers.length} of {normalizedWorkers.length} workers</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:12}}>Showing {filteredWorkers.length} of {normalizedWorkers.length} workers — click a row to add relationship notes</div>
 
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
               <thead><tr style={{borderBottom:`1px solid ${C.border}`}}>
-                {["Name","Location","Phone","Certifications","Notes","Status"].map(h=>(
+                {["Name","Location","Phone","Last Contacted","Notes","Status"].map(h=>(
                   <th key={h} style={{textAlign:"left",padding:"9px 12px",color:C.muted,fontWeight:700,fontSize:10,textTransform:"uppercase"}}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>{filteredWorkers.slice(0,100).map(w=>(
-                <tr key={w.id} style={{borderBottom:`1px solid ${C.border}`}}>
+                <>
+                <tr key={w.id} onClick={()=>{
+                    if (expandedWorkerId===w.id) { setExpandedWorkerId(null); return; }
+                    setExpandedWorkerId(w.id);
+                    setWorkerNotesDraft(prev => ({...prev, [w.id]: prev[w.id] ?? w.notes ?? ""}));
+                  }} style={{borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:expandedWorkerId===w.id?C.navyLight:"transparent"}}>
                   <td style={{padding:"11px 12px"}}>
                     <div style={{color:C.chalk,fontWeight:600}}>{w.name}</div>
                     {w.experience && <div style={{fontSize:10,color:C.amber}}>{w.experience} exp</div>}
                   </td>
                   <td style={{padding:"11px 12px",color:C.chalk}}>{w.city}{w.city && w.state ? ", " : ""}{w.state}</td>
                   <td style={{padding:"11px 12px",color:C.muted,fontSize:12}}>{w.phone}</td>
-                  <td style={{padding:"11px 12px",color:C.muted,fontSize:11}}>{w.certifications ? (w.certifications.slice(0,28) + (w.certifications.length>28?"...":"")) : "—"}</td>
-                  <td style={{padding:"11px 12px",color:C.muted,fontSize:11}}>{w.comments ? (w.comments.slice(0,40) + (w.comments.length>40?"...":"")) : "—"}</td>
+                  <td style={{padding:"11px 12px",color:C.muted,fontSize:11}}>{w.last_contacted ? new Date(w.last_contacted).toLocaleDateString() : "Never"}</td>
+                  <td style={{padding:"11px 12px",color:C.muted,fontSize:11}}>{w.notes ? (w.notes.slice(0,30) + (w.notes.length>30?"...":"")) : "—"}</td>
                   <td style={{padding:"11px 12px"}}><Badge status={w.status}/></td>
                 </tr>
+                {expandedWorkerId===w.id && (
+                  <tr>
+                    <td colSpan={6} style={{padding:"14px 18px",background:C.navyLight,borderBottom:`1px solid ${C.border}`}}>
+                      <label style={label}>Relationship Notes</label>
+                      <textarea
+                        style={{...field,resize:"vertical",minHeight:64}}
+                        value={workerNotesDraft[w.id] ?? ""}
+                        onChange={e=>setWorkerNotesDraft(prev=>({...prev,[w.id]:e.target.value}))}
+                        placeholder="e.g. Called 7/20 — reliable, prefers weekend jobs, interested in crew lead role..."
+                      />
+                      <div style={{display:"flex",gap:10,alignItems:"center",marginTop:8}}>
+                        <button onClick={()=>handleSaveWorkerNote(w.id)} disabled={!!workerNoteSaving[w.id]} style={{...btn(),padding:"8px 16px",fontSize:12,opacity:workerNoteSaving[w.id]?0.6:1}}>
+                          {workerNoteSaving[w.id] ? "Saving..." : "Save Note"}
+                        </button>
+                        {workerNoteResult[w.id] && (
+                          <span style={{fontSize:12,color:workerNoteResult[w.id].startsWith("✓")?C.green:C.red,fontWeight:600}}>{workerNoteResult[w.id]}</span>
+                        )}
+                        {w.last_contacted && (
+                          <span style={{fontSize:11,color:C.muted}}>Last contacted: {new Date(w.last_contacted).toLocaleString()}</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </>
               ))}</tbody>
             </table>
             {filteredWorkers.length>100 && <div style={{padding:14,color:C.muted,fontSize:12,textAlign:"center"}}>Showing first 100 results. Refine filters to narrow down.</div>}
