@@ -12,6 +12,13 @@ const C = {
 };
 
 const SKILL_TYPES = ["Loading","Unloading","Packing","Inventory","Assembly","Class A Driver","Crew Lead","Driving","Shuttle","Crating","Delivery"];
+const TEMP_OPTIONS = ["New","Warming Up","Reliable","Went Quiet"];
+const TEMP_COLORS = {
+  "New": { bg:"#1C1F2E", color:"#60A5FA" },
+  "Warming Up": { bg:"#2A2410", color:"#F5A623" },
+  "Reliable": { bg:"#163B2A", color:"#22C55E" },
+  "Went Quiet": { bg:"#2A1A1A", color:"#EF4444" },
+};
 
 // ─── MOCK JOBS (kept as fallback/demo data for public-facing pages) ──────────
 const INITIAL_JOBS = [
@@ -1037,6 +1044,7 @@ function AdminPortal({ token, onLogout }) {
   // ── Worker notes editing state ──
   const [expandedWorkerId, setExpandedWorkerId] = useState(null);
   const [workerNotesDraft, setWorkerNotesDraft] = useState({});
+  const [workerTempDraft, setWorkerTempDraft] = useState({});
   const [workerNoteSaving, setWorkerNoteSaving] = useState({});
   const [workerNoteResult, setWorkerNoteResult] = useState({});
 
@@ -1139,11 +1147,11 @@ function AdminPortal({ token, onLogout }) {
       const res = await fetch(`${API_BASE}/api/workers/${workerId}/notes`, {
         method: "PATCH",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: workerNotesDraft[workerId] ?? "" })
+        body: JSON.stringify({ notes: workerNotesDraft[workerId] ?? "", temperature: workerTempDraft[workerId] ?? "" })
       });
       const data = await res.json();
       if (res.ok) {
-        setWorkers(prev => prev.map(w => w.id === workerId ? { ...w, notes: data.worker.notes, last_contacted: data.worker.last_contacted } : w));
+        setWorkers(prev => prev.map(w => w.id === workerId ? { ...w, notes: data.worker.notes, temperature: data.worker.temperature, last_contacted: data.worker.last_contacted } : w));
         setWorkerNoteResult(prev => ({...prev, [workerId]: "✓ Saved"}));
       } else {
         setWorkerNoteResult(prev => ({...prev, [workerId]: `Error: ${data.error}`}));
@@ -1262,6 +1270,7 @@ function AdminPortal({ token, onLogout }) {
     experience: w.experience || null,
     notes: w.notes || "",
     last_contacted: w.last_contacted || null,
+    temperature: w.temperature || "",
   })), [workers]);
 
   const STATES = useMemo(() => [...new Set(normalizedWorkers.map(w => w.state).filter(Boolean))].sort(), [normalizedWorkers]);
@@ -1423,6 +1432,7 @@ function AdminPortal({ token, onLogout }) {
             <StatCard label="With Crew/Team" value={normalizedWorkers.filter(w=>w.crew).length} color={C.amber}/>
             <StatCard label="Military Base Access" value={normalizedWorkers.filter(w=>w.bases).length} color={C.green}/>
             <StatCard label="Active Status" value={normalizedWorkers.filter(w=>w.status==="active").length} color={C.blue}/>
+            <StatCard label="Went Quiet" value={normalizedWorkers.filter(w=>w.temperature==="Went Quiet").length} color={C.red}/>
           </div>
 
           {/* Filters */}
@@ -1443,7 +1453,7 @@ function AdminPortal({ token, onLogout }) {
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
               <thead><tr style={{borderBottom:`1px solid ${C.border}`}}>
-                {["Name","Location","Phone","Last Contacted","Notes","Status"].map(h=>(
+                {["Name","Location","Phone","Last Contacted","Notes","Temp","Status"].map(h=>(
                   <th key={h} style={{textAlign:"left",padding:"9px 12px",color:C.muted,fontWeight:700,fontSize:10,textTransform:"uppercase"}}>{h}</th>
                 ))}
               </tr></thead>
@@ -1453,6 +1463,7 @@ function AdminPortal({ token, onLogout }) {
                     if (expandedWorkerId===w.id) { setExpandedWorkerId(null); return; }
                     setExpandedWorkerId(w.id);
                     setWorkerNotesDraft(prev => ({...prev, [w.id]: prev[w.id] ?? w.notes ?? ""}));
+                    setWorkerTempDraft(prev => ({...prev, [w.id]: prev[w.id] ?? w.temperature ?? ""}));
                   }} style={{borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:expandedWorkerId===w.id?C.navyLight:"transparent"}}>
                   <td style={{padding:"11px 12px"}}>
                     <div style={{color:C.chalk,fontWeight:600}}>{w.name}</div>
@@ -1462,21 +1473,37 @@ function AdminPortal({ token, onLogout }) {
                   <td style={{padding:"11px 12px",color:C.muted,fontSize:12}}>{w.phone}</td>
                   <td style={{padding:"11px 12px",color:C.muted,fontSize:11}}>{w.last_contacted ? new Date(w.last_contacted).toLocaleDateString() : "Never"}</td>
                   <td style={{padding:"11px 12px",color:C.muted,fontSize:11}}>{w.notes ? (w.notes.slice(0,30) + (w.notes.length>30?"...":"")) : "—"}</td>
+                  <td style={{padding:"11px 12px"}}>
+                    {w.temperature ? (
+                      <span style={{background:TEMP_COLORS[w.temperature]?.bg||"#222",color:TEMP_COLORS[w.temperature]?.color||"#aaa",padding:"2px 10px",borderRadius:20,fontSize:10,fontWeight:800,letterSpacing:"0.04em"}}>{w.temperature}</span>
+                    ) : <span style={{color:C.muted,fontSize:11}}>—</span>}
+                  </td>
                   <td style={{padding:"11px 12px"}}><Badge status={w.status}/></td>
                 </tr>
                 {expandedWorkerId===w.id && (
                   <tr>
-                    <td colSpan={6} style={{padding:"14px 18px",background:C.navyLight,borderBottom:`1px solid ${C.border}`}}>
-                      <label style={label}>Relationship Notes</label>
-                      <textarea
-                        style={{...field,resize:"vertical",minHeight:64}}
-                        value={workerNotesDraft[w.id] ?? ""}
-                        onChange={e=>setWorkerNotesDraft(prev=>({...prev,[w.id]:e.target.value}))}
-                        placeholder="e.g. Called 7/20 — reliable, prefers weekend jobs, interested in crew lead role..."
-                      />
+                    <td colSpan={7} style={{padding:"14px 18px",background:C.navyLight,borderBottom:`1px solid ${C.border}`}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 200px",gap:14,marginBottom:8}}>
+                        <div>
+                          <label style={label}>Relationship Notes</label>
+                          <textarea
+                            style={{...field,resize:"vertical",minHeight:64}}
+                            value={workerNotesDraft[w.id] ?? ""}
+                            onChange={e=>setWorkerNotesDraft(prev=>({...prev,[w.id]:e.target.value}))}
+                            placeholder="e.g. Called 7/20 — reliable, prefers weekend jobs, interested in crew lead role..."
+                          />
+                        </div>
+                        <div>
+                          <label style={label}>Temperature</label>
+                          <select style={field} value={workerTempDraft[w.id] ?? ""} onChange={e=>setWorkerTempDraft(prev=>({...prev,[w.id]:e.target.value}))}>
+                            <option value="">— Not set —</option>
+                            {TEMP_OPTIONS.map(t=><option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                      </div>
                       <div style={{display:"flex",gap:10,alignItems:"center",marginTop:8}}>
                         <button onClick={()=>handleSaveWorkerNote(w.id)} disabled={!!workerNoteSaving[w.id]} style={{...btn(),padding:"8px 16px",fontSize:12,opacity:workerNoteSaving[w.id]?0.6:1}}>
-                          {workerNoteSaving[w.id] ? "Saving..." : "Save Note"}
+                          {workerNoteSaving[w.id] ? "Saving..." : "Save"}
                         </button>
                         {workerNoteResult[w.id] && (
                           <span style={{fontSize:12,color:workerNoteResult[w.id].startsWith("✓")?C.green:C.red,fontWeight:600}}>{workerNoteResult[w.id]}</span>
