@@ -1044,7 +1044,7 @@ function AdminLogin({ onLogin }) {
 
 // ─── ADMIN PORTAL ─────────────────────────────────────────────────────────────
 function AdminPortal({ token, onLogout }) {
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("today");
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState("");
   const [skillFilter, setSkillFilter] = useState("");
@@ -1076,6 +1076,14 @@ function AdminPortal({ token, onLogout }) {
   const [partnerDraft, setPartnerDraft] = useState({});
   const [partnerSaving, setPartnerSaving] = useState({});
   const [partnerSaveResult, setPartnerSaveResult] = useState({});
+
+  // ── Today / To-Do list state ──
+  const [todos, setTodos] = useState([]);
+  const [todosLoading, setTodosLoading] = useState(true);
+  const [todosLoadError, setTodosLoadError] = useState("");
+  const [newTodoText, setNewTodoText] = useState("");
+  const [todoAdding, setTodoAdding] = useState(false);
+  const [todoActionLoading, setTodoActionLoading] = useState({});
 
   const handleExpandJob = async (job) => {
     if (expandedJobId === job.rawId) { setExpandedJobId(null); return; }
@@ -1228,6 +1236,86 @@ function AdminPortal({ token, onLogout }) {
     }
   };
 
+  // ── To-Do list: load, add, toggle, delete ──
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTodos() {
+      setTodosLoading(true);
+      setTodosLoadError("");
+      try {
+        const res = await fetch(`${API_BASE}/api/todos`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error(`Server responded ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) setTodos(data.todos || []);
+      } catch (e) {
+        if (!cancelled) setTodosLoadError("Could not load to-do list. " + e.message);
+      } finally {
+        if (!cancelled) setTodosLoading(false);
+      }
+    }
+    loadTodos();
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const handleAddTodo = async () => {
+    if (!newTodoText.trim()) return;
+    setTodoAdding(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/todos`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ text: newTodoText.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTodos(prev => [data.todo, ...prev]);
+        setNewTodoText("");
+      }
+    } catch (e) {
+      console.error("Add todo failed", e);
+    } finally {
+      setTodoAdding(false);
+    }
+  };
+
+  const handleToggleTodo = async (id, currentDone) => {
+    setTodoActionLoading(prev => ({...prev, [id]: true}));
+    try {
+      const res = await fetch(`${API_BASE}/api/todos/${id}`, {
+        method: "PATCH",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ done: !currentDone })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTodos(prev => prev.map(t => t.id === id ? data.todo : t));
+      }
+    } catch (e) {
+      console.error("Toggle todo failed", e);
+    } finally {
+      setTodoActionLoading(prev => ({...prev, [id]: false}));
+    }
+  };
+
+  const handleDeleteTodo = async (id) => {
+    setTodoActionLoading(prev => ({...prev, [id]: true}));
+    try {
+      const res = await fetch(`${API_BASE}/api/todos/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setTodos(prev => prev.filter(t => t.id !== id));
+      }
+    } catch (e) {
+      console.error("Delete todo failed", e);
+    } finally {
+      setTodoActionLoading(prev => ({...prev, [id]: false}));
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     async function loadJobs() {
@@ -1377,6 +1465,28 @@ function AdminPortal({ token, onLogout }) {
     );
   }, [partners, partnerSearch]);
 
+  // ── TODAY BRIEFING: derived from data already loaded, no extra API calls ──
+  const jobsNeedingAction = useMemo(() =>
+    normalizedJobs.filter(j => ["Pending","Dispatching"].includes(j.status))
+  , [normalizedJobs]);
+
+  const workersWentQuiet = useMemo(() =>
+    normalizedWorkers.filter(w => w.temperature === "Went Quiet")
+  , [normalizedWorkers]);
+
+  const workersNeverContacted = useMemo(() =>
+    normalizedWorkers.filter(w => !w.last_contacted)
+  , [normalizedWorkers]);
+
+  const partnersNeedingCheckIn = useMemo(() => {
+    const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    return partners.filter(p => {
+      if (!p.last_contacted) return true;
+      return (now - new Date(p.last_contacted).getTime()) > FOURTEEN_DAYS;
+    });
+  }, [partners]);
+
   return (
     <div style={{padding:"28px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,flexWrap:"wrap",gap:12}}>
@@ -1396,10 +1506,130 @@ function AdminPortal({ token, onLogout }) {
         </div>
       )}
 
-      <Tabs tabs={[["overview","Overview"],["workers","Workers"],["jobs","All Jobs"],["partners","Partners"],["dispatch","Dispatch Sim"]]} active={tab} onChange={setTab}/>
+      <Tabs tabs={[["today","Today"],["overview","Overview"],["workers","Workers"],["jobs","All Jobs"],["partners","Partners"],["dispatch","Dispatch Sim"]]} active={tab} onChange={setTab}/>
 
       {(loading || jobsLoading) ? <Spinner/> : (
       <>
+      {/* ── TODAY ── */}
+      {tab==="today" && (
+        <div>
+          <div style={{display:"flex",gap:14,marginBottom:24,flexWrap:"wrap"}}>
+            <StatCard label="Jobs Needing Action" value={jobsNeedingAction.length} color={C.amber}/>
+            <StatCard label="Workers Gone Quiet" value={workersWentQuiet.length} color={C.red}/>
+            <StatCard label="Never Contacted" value={workersNeverContacted.length} color={C.blue}/>
+            <StatCard label="Partners to Check In On" value={partnersNeedingCheckIn.length} color={C.chalk}/>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+            {/* Jobs needing action */}
+            <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20}}>
+              <div style={{fontWeight:700,color:C.chalk,marginBottom:12}}>📋 Jobs Needing Action</div>
+              {jobsNeedingAction.length===0 ? (
+                <div style={{color:C.muted,fontSize:13}}>Nothing pending — all caught up.</div>
+              ) : jobsNeedingAction.slice(0,8).map(j=>(
+                <div key={j.rawId} onClick={()=>{setTab("jobs");}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.border}`,cursor:"pointer",flexWrap:"wrap",gap:6}}>
+                  <div>
+                    <span style={{color:C.amber,fontWeight:700,marginRight:8,fontSize:12}}>{j.id}</span>
+                    <span style={{color:C.chalk,fontSize:12}}>{j.customer} — {j.location}</span>
+                  </div>
+                  <Badge status={j.status}/>
+                </div>
+              ))}
+              {jobsNeedingAction.length>8 && <div style={{fontSize:11,color:C.muted,marginTop:8}}>+{jobsNeedingAction.length-8} more — see All Jobs tab</div>}
+            </div>
+
+            {/* Workers gone quiet */}
+            <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20}}>
+              <div style={{fontWeight:700,color:C.chalk,marginBottom:12}}>🥶 Workers Gone Quiet</div>
+              {workersWentQuiet.length===0 ? (
+                <div style={{color:C.muted,fontSize:13}}>No one flagged as quiet right now.</div>
+              ) : workersWentQuiet.slice(0,8).map(w=>(
+                <div key={w.id} onClick={()=>{setTab("workers");setSearch(w.name);}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.border}`,cursor:"pointer",flexWrap:"wrap",gap:6}}>
+                  <div>
+                    <span style={{color:C.chalk,fontWeight:600,fontSize:12}}>{w.name}</span>
+                    <span style={{color:C.muted,fontSize:11,marginLeft:8}}>{w.city}, {w.state}</span>
+                  </div>
+                  <span style={{color:C.muted,fontSize:11}}>{w.phone}</span>
+                </div>
+              ))}
+              {workersWentQuiet.length>8 && <div style={{fontSize:11,color:C.muted,marginTop:8}}>+{workersWentQuiet.length-8} more — see Workers tab</div>}
+            </div>
+
+            {/* Never contacted workers */}
+            <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20}}>
+              <div style={{fontWeight:700,color:C.chalk,marginBottom:12}}>📱 Workers Never Contacted</div>
+              {workersNeverContacted.length===0 ? (
+                <div style={{color:C.muted,fontSize:13}}>Everyone's had at least one touchpoint.</div>
+              ) : (
+                <div style={{color:C.muted,fontSize:13,lineHeight:1.7}}>
+                  {workersNeverContacted.length} workers haven't been contacted yet — worth an intro blast or a batch of check-in calls. <span style={{color:C.amber,cursor:"pointer",fontWeight:600}} onClick={()=>setTab("workers")}>Go to Workers →</span>
+                </div>
+              )}
+            </div>
+
+            {/* Partners to check in on */}
+            <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20}}>
+              <div style={{fontWeight:700,color:C.chalk,marginBottom:12}}>🤝 Partners to Check In On</div>
+              {partnersNeedingCheckIn.length===0 ? (
+                <div style={{color:C.muted,fontSize:13}}>Everyone's been contacted in the last 2 weeks.</div>
+              ) : partnersNeedingCheckIn.slice(0,8).map(p=>(
+                <div key={p.key} onClick={()=>{setTab("partners");setPartnerSearch(p.company!=="—"?p.company:p.contact_name);}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.border}`,cursor:"pointer",flexWrap:"wrap",gap:6}}>
+                  <div>
+                    <span style={{color:C.chalk,fontWeight:600,fontSize:12}}>{p.company}</span>
+                    <span style={{color:C.muted,fontSize:11,marginLeft:8}}>{p.contact_name}</span>
+                  </div>
+                  <span style={{color:C.muted,fontSize:11}}>{p.last_contacted ? `Last: ${new Date(p.last_contacted).toLocaleDateString()}` : "Never contacted"}</span>
+                </div>
+              ))}
+              {partnersNeedingCheckIn.length>8 && <div style={{fontSize:11,color:C.muted,marginTop:8}}>+{partnersNeedingCheckIn.length-8} more — see Partners tab</div>}
+            </div>
+          </div>
+
+          {/* Manual to-do list */}
+          <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20}}>
+            <div style={{fontWeight:700,color:C.chalk,marginBottom:14}}>✏️ To-Do List</div>
+            <div style={{display:"flex",gap:8,marginBottom:16}}>
+              <input
+                style={{...field,flex:1}}
+                value={newTodoText}
+                onChange={e=>setNewTodoText(e.target.value)}
+                onKeyDown={e=>e.key==="Enter" && handleAddTodo()}
+                placeholder="Add something to remember for today..."
+              />
+              <button onClick={handleAddTodo} disabled={todoAdding || !newTodoText.trim()} style={{...btn(),padding:"10px 18px",opacity:(todoAdding||!newTodoText.trim())?0.6:1}}>
+                {todoAdding ? "Adding..." : "+ Add"}
+              </button>
+            </div>
+
+            {todosLoadError && (
+              <div style={{color:C.red,fontSize:12,marginBottom:12}}>{todosLoadError}</div>
+            )}
+
+            {todosLoading ? (
+              <div style={{color:C.muted,fontSize:13}}>Loading to-do list...</div>
+            ) : todos.length===0 ? (
+              <div style={{color:C.muted,fontSize:13}}>Nothing on your list yet — add something above.</div>
+            ) : (
+              <div>
+                {todos.map(t=>(
+                  <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:`1px solid ${C.border}`,opacity:todoActionLoading[t.id]?0.5:1}}>
+                    <input
+                      type="checkbox"
+                      checked={t.done}
+                      onChange={()=>handleToggleTodo(t.id, t.done)}
+                      disabled={!!todoActionLoading[t.id]}
+                      style={{width:16,height:16,accentColor:C.amber,cursor:"pointer",flexShrink:0}}
+                    />
+                    <span style={{flex:1,fontSize:13,color:t.done?C.muted:C.chalk,textDecoration:t.done?"line-through":"none"}}>{t.text}</span>
+                    <button onClick={()=>handleDeleteTodo(t.id)} disabled={!!todoActionLoading[t.id]} style={{background:"transparent",border:"none",color:C.muted,cursor:"pointer",fontSize:16,padding:"2px 6px"}}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── OVERVIEW ── */}
       {tab==="overview" && (
         <div>
