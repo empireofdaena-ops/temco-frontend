@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API_BASE = "https://temco-backend-production.up.railway.app";
@@ -1040,6 +1040,12 @@ function AdminPortal({ token, onLogout }) {
   const [workerNoteSaving, setWorkerNoteSaving] = useState({});
   const [workerNoteResult, setWorkerNoteResult] = useState({});
 
+  // ── Partner (company/contact) detail editing state ──
+  const [expandedPartnerSection, setExpandedPartnerSection] = useState(null); // `${customerId}:company` or `${customerId}:contact`
+  const [partnerDraft, setPartnerDraft] = useState({});
+  const [partnerSaving, setPartnerSaving] = useState({});
+  const [partnerSaveResult, setPartnerSaveResult] = useState({});
+
   const handleExpandJob = async (job) => {
     if (expandedJobId === job.rawId) { setExpandedJobId(null); return; }
     setExpandedJobId(job.rawId);
@@ -1149,6 +1155,48 @@ function AdminPortal({ token, onLogout }) {
     }
   };
 
+  // ── Save partner (company or contact) details ──
+  // fields: object with only the keys relevant to whichever section (company/contact) was edited
+  const handleSavePartnerDetails = async (customerId, fields) => {
+    if (!customerId) {
+      setPartnerSaveResult(prev => ({...prev, [expandedPartnerSection]: "No customer ID on file for this partner — cannot save yet."}));
+      return;
+    }
+    setPartnerSaving(prev => ({...prev, [expandedPartnerSection]: true}));
+    setPartnerSaveResult(prev => ({...prev, [expandedPartnerSection]: ""}));
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/customers/${customerId}`, {
+        method: "PATCH",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(fields)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLiveJobs(prev => prev.map(j => j.customer_id === customerId ? {
+          ...j,
+          company_address: data.customer.company_address,
+          company_phone: data.customer.company_phone,
+          website: data.customer.website,
+          dot_number: data.customer.dot_number,
+          fleet_size: data.customer.fleet_size,
+          contact_position: data.customer.contact_position,
+          contact_direct_phone: data.customer.contact_direct_phone,
+          contact_type: data.customer.contact_type,
+          contact_type_detail: data.customer.contact_type_detail,
+          customer_notes: data.customer.notes,
+          customer_last_contacted: data.customer.last_contacted,
+        } : j));
+        setPartnerSaveResult(prev => ({...prev, [expandedPartnerSection]: "✓ Saved"}));
+      } else {
+        setPartnerSaveResult(prev => ({...prev, [expandedPartnerSection]: `Error: ${data.error}`}));
+      }
+    } catch (e) {
+      setPartnerSaveResult(prev => ({...prev, [expandedPartnerSection]: "Could not reach server"}));
+    } finally {
+      setPartnerSaving(prev => ({...prev, [expandedPartnerSection]: false}));
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     async function loadJobs() {
@@ -1249,17 +1297,32 @@ function AdminPortal({ token, onLogout }) {
   const partners = useMemo(() => {
     const map = {};
     liveJobs.forEach(j => {
-      const key = j.customer_email || j.company || j.contact_name;
+      const key = j.customer_id || j.customer_email || j.company || j.contact_name;
       if (!key) return;
       if (!map[key]) {
         map[key] = {
           key,
+          customerId: j.customer_id,
           company: j.company || "—",
           contact_name: j.contact_name || "—",
           email: j.customer_email || "—",
+          phone: j.customer_phone || "",
           jobCount: 0,
           totalRevenue: 0,
           lastActive: null,
+          // Extended company details
+          company_address: j.company_address || "",
+          company_phone: j.company_phone || "",
+          website: j.website || "",
+          dot_number: j.dot_number || "",
+          fleet_size: j.fleet_size || "",
+          // Extended contact details
+          contact_position: j.contact_position || "",
+          contact_direct_phone: j.contact_direct_phone || "",
+          contact_type: j.contact_type || "",
+          contact_type_detail: j.contact_type_detail || "",
+          notes: j.customer_notes || "",
+          last_contacted: j.customer_last_contacted || null,
         };
       }
       map[key].jobCount += 1;
@@ -1385,8 +1448,8 @@ function AdminPortal({ token, onLogout }) {
                 ))}
               </tr></thead>
               <tbody>{filteredWorkers.slice(0,100).map(w=>(
-                <>
-                <tr key={w.id} onClick={()=>{
+                <Fragment key={w.id}>
+                <tr onClick={()=>{
                     if (expandedWorkerId===w.id) { setExpandedWorkerId(null); return; }
                     setExpandedWorkerId(w.id);
                     setWorkerNotesDraft(prev => ({...prev, [w.id]: prev[w.id] ?? w.notes ?? ""}));
@@ -1425,7 +1488,7 @@ function AdminPortal({ token, onLogout }) {
                     </td>
                   </tr>
                 )}
-                </>
+                </Fragment>
               ))}</tbody>
             </table>
             {filteredWorkers.length>100 && <div style={{padding:14,color:C.muted,fontSize:12,textAlign:"center"}}>Showing first 100 results. Refine filters to narrow down.</div>}
@@ -1539,7 +1602,7 @@ function AdminPortal({ token, onLogout }) {
           </div>
 
           <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.6}}>
-            This list is built automatically from customers who've submitted job requests — no separate signup needed. Use it to follow up, share new services, or explore partnerships.
+            This list is built automatically from customers who've submitted job requests — no separate signup needed. Click a company name for company details, or a contact name for role and direct contact info.
           </div>
 
           <input style={{...field,marginBottom:16,maxWidth:400}} value={partnerSearch} onChange={e=>setPartnerSearch(e.target.value)} placeholder="Search by company, contact, or email..."/>
@@ -1551,16 +1614,97 @@ function AdminPortal({ token, onLogout }) {
                   <th key={h} style={{textAlign:"left",padding:"9px 12px",color:C.muted,fontWeight:700,fontSize:10,textTransform:"uppercase"}}>{h}</th>
                 ))}
               </tr></thead>
-              <tbody>{filteredPartners.map(p=>(
-                <tr key={p.key} style={{borderBottom:`1px solid ${C.border}`}}>
-                  <td style={{padding:"11px 12px",color:C.chalk,fontWeight:600}}>{p.company}</td>
-                  <td style={{padding:"11px 12px",color:C.chalk}}>{p.contact_name}</td>
-                  <td style={{padding:"11px 12px",color:C.muted,fontSize:12}}>{p.email}</td>
-                  <td style={{padding:"11px 12px",color:C.chalk}}>{p.jobCount}</td>
-                  <td style={{padding:"11px 12px",color:C.green,fontWeight:700}}>${p.totalRevenue.toLocaleString()}</td>
-                  <td style={{padding:"11px 12px",color:C.muted,fontSize:12}}>{p.lastActive ? p.lastActive.toLocaleDateString() : "—"}</td>
-                </tr>
-              ))}</tbody>
+              <tbody>{filteredPartners.map(p=>{
+                const companyKey = `${p.customerId}:company`;
+                const contactKey = `${p.customerId}:contact`;
+                const isCompanyOpen = expandedPartnerSection === companyKey;
+                const isContactOpen = expandedPartnerSection === contactKey;
+
+                const openCompany = () => {
+                  if (isCompanyOpen) { setExpandedPartnerSection(null); return; }
+                  setExpandedPartnerSection(companyKey);
+                  setPartnerDraft(prev => ({...prev, [companyKey]: prev[companyKey] ?? {
+                    company_address: p.company_address, company_phone: p.company_phone,
+                    website: p.website, dot_number: p.dot_number, fleet_size: p.fleet_size,
+                  }}));
+                };
+                const openContact = () => {
+                  if (isContactOpen) { setExpandedPartnerSection(null); return; }
+                  setExpandedPartnerSection(contactKey);
+                  setPartnerDraft(prev => ({...prev, [contactKey]: prev[contactKey] ?? {
+                    contact_position: p.contact_position, contact_direct_phone: p.contact_direct_phone,
+                    contact_type: p.contact_type, contact_type_detail: p.contact_type_detail,
+                  }}));
+                };
+
+                const contactTypeLabel = { Driver: "Van Line / Company Driving For", "Moving Company": "Position / Role", Broker: "Brokerage Company Name" }[partnerDraft[contactKey]?.contact_type] || "Type Detail";
+
+                return (
+                  <Fragment key={p.key}>
+                  <tr style={{borderBottom:`1px solid ${C.border}`}}>
+                    <td style={{padding:"11px 12px",color:C.amber,fontWeight:600,cursor:"pointer",textDecoration:"underline"}} onClick={openCompany}>{p.company}</td>
+                    <td style={{padding:"11px 12px",color:C.amber,cursor:"pointer",textDecoration:"underline"}} onClick={openContact}>{p.contact_name}</td>
+                    <td style={{padding:"11px 12px",color:C.muted,fontSize:12}}>{p.email}</td>
+                    <td style={{padding:"11px 12px",color:C.chalk}}>{p.jobCount}</td>
+                    <td style={{padding:"11px 12px",color:C.green,fontWeight:700}}>${p.totalRevenue.toLocaleString()}</td>
+                    <td style={{padding:"11px 12px",color:C.muted,fontSize:12}}>{p.lastActive ? p.lastActive.toLocaleDateString() : "—"}</td>
+                  </tr>
+
+                  {isCompanyOpen && (
+                    <tr>
+                      <td colSpan={6} style={{padding:"16px 18px",background:C.navyLight,borderBottom:`1px solid ${C.border}`}}>
+                        <div style={{fontSize:11,color:C.amber,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:12}}>Company Details — {p.company}</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:10}}>
+                          <div><label style={label}>Company Address</label><input style={field} value={partnerDraft[companyKey]?.company_address ?? ""} onChange={e=>setPartnerDraft(prev=>({...prev,[companyKey]:{...prev[companyKey],company_address:e.target.value}}))} placeholder="123 Main St, City, ST ZIP"/></div>
+                          <div><label style={label}>Company Phone</label><input style={field} value={partnerDraft[companyKey]?.company_phone ?? ""} onChange={e=>setPartnerDraft(prev=>({...prev,[companyKey]:{...prev[companyKey],company_phone:e.target.value}}))} placeholder="Main office line, if different"/></div>
+                          <div><label style={label}>Website</label><input style={field} value={partnerDraft[companyKey]?.website ?? ""} onChange={e=>setPartnerDraft(prev=>({...prev,[companyKey]:{...prev[companyKey],website:e.target.value}}))} placeholder="https://..."/></div>
+                          <div><label style={label}>DOT / MC Number</label><input style={field} value={partnerDraft[companyKey]?.dot_number ?? ""} onChange={e=>setPartnerDraft(prev=>({...prev,[companyKey]:{...prev[companyKey],dot_number:e.target.value}}))} placeholder="DOT#1234567"/></div>
+                          <div><label style={label}>Fleet Size</label><input style={field} value={partnerDraft[companyKey]?.fleet_size ?? ""} onChange={e=>setPartnerDraft(prev=>({...prev,[companyKey]:{...prev[companyKey],fleet_size:e.target.value}}))} placeholder="e.g. 12 trucks"/></div>
+                        </div>
+                        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                          <button onClick={()=>handleSavePartnerDetails(p.customerId, partnerDraft[companyKey])} disabled={!!partnerSaving[companyKey]} style={{...btn(),padding:"8px 16px",fontSize:12,opacity:partnerSaving[companyKey]?0.6:1}}>
+                            {partnerSaving[companyKey] ? "Saving..." : "Save Company Details"}
+                          </button>
+                          {partnerSaveResult[companyKey] && (
+                            <span style={{fontSize:12,color:partnerSaveResult[companyKey].startsWith("✓")?C.green:C.red,fontWeight:600}}>{partnerSaveResult[companyKey]}</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+
+                  {isContactOpen && (
+                    <tr>
+                      <td colSpan={6} style={{padding:"16px 18px",background:C.navyLight,borderBottom:`1px solid ${C.border}`}}>
+                        <div style={{fontSize:11,color:C.amber,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:12}}>Contact Details — {p.contact_name}</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:10}}>
+                          <div>
+                            <label style={label}>Contact Type</label>
+                            <select style={field} value={partnerDraft[contactKey]?.contact_type ?? ""} onChange={e=>setPartnerDraft(prev=>({...prev,[contactKey]:{...prev[contactKey],contact_type:e.target.value}}))}>
+                              <option value="">Select type</option>
+                              <option value="Driver">Driver</option>
+                              <option value="Moving Company">Moving Company</option>
+                              <option value="Broker">Broker</option>
+                            </select>
+                          </div>
+                          <div><label style={label}>{contactTypeLabel}</label><input style={field} value={partnerDraft[contactKey]?.contact_type_detail ?? ""} onChange={e=>setPartnerDraft(prev=>({...prev,[contactKey]:{...prev[contactKey],contact_type_detail:e.target.value}}))} placeholder="e.g. Atlas Van Lines"/></div>
+                          <div><label style={label}>Position / Role</label><input style={field} value={partnerDraft[contactKey]?.contact_position ?? ""} onChange={e=>setPartnerDraft(prev=>({...prev,[contactKey]:{...prev[contactKey],contact_position:e.target.value}}))} placeholder="Dispatcher, Owner, Ops Manager..."/></div>
+                          <div><label style={label}>Direct Phone</label><input style={field} value={partnerDraft[contactKey]?.contact_direct_phone ?? ""} onChange={e=>setPartnerDraft(prev=>({...prev,[contactKey]:{...prev[contactKey],contact_direct_phone:e.target.value}}))} placeholder="If different from company line"/></div>
+                        </div>
+                        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                          <button onClick={()=>handleSavePartnerDetails(p.customerId, partnerDraft[contactKey])} disabled={!!partnerSaving[contactKey]} style={{...btn(),padding:"8px 16px",fontSize:12,opacity:partnerSaving[contactKey]?0.6:1}}>
+                            {partnerSaving[contactKey] ? "Saving..." : "Save Contact Details"}
+                          </button>
+                          {partnerSaveResult[contactKey] && (
+                            <span style={{fontSize:12,color:partnerSaveResult[contactKey].startsWith("✓")?C.green:C.red,fontWeight:600}}>{partnerSaveResult[contactKey]}</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
+                );
+              })}</tbody>
             </table>
             {filteredPartners.length===0 && <div style={{padding:30,color:C.muted,fontSize:13,textAlign:"center"}}>No partners match this search.</div>}
           </div>
