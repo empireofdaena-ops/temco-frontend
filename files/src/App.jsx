@@ -100,6 +100,29 @@ function Spinner() {
   );
 }
 
+// ─── CSV EXPORT HELPER ────────────────────────────────────────────────────────
+// rows: array of objects; columns: [[header, accessorFn]] — accessorFn(row) returns the cell value
+function exportToCSV(filename, rows, columns) {
+  const escapeCell = (val) => {
+    const s = (val === null || val === undefined) ? "" : String(val);
+    // Quote any field containing a comma, quote, or newline — and escape embedded quotes
+    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const header = columns.map(([h]) => escapeCell(h)).join(",");
+  const body = rows.map(row => columns.map(([, accessor]) => escapeCell(accessor(row))).join(",")).join("\n");
+  const csv = `${header}\n${body}`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 // ─── PUBLIC HOME ──────────────────────────────────────────────────────────────
 function PublicHome({ onNav, workerCount, stateCount }) {
   return (
@@ -1448,7 +1471,34 @@ function AdminPortal({ token, onLogout }) {
             </select>
           </div>
 
-          <div style={{fontSize:12,color:C.muted,marginBottom:12}}>Showing {filteredWorkers.length} of {normalizedWorkers.length} workers — click a row to add relationship notes</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+            <div style={{fontSize:12,color:C.muted}}>Showing {filteredWorkers.length} of {normalizedWorkers.length} workers — click a row to add relationship notes</div>
+            <button
+              onClick={()=>exportToCSV(
+                `temco-workers-${new Date().toISOString().slice(0,10)}.csv`,
+                filteredWorkers,
+                [
+                  ["Name", w=>w.name],
+                  ["City", w=>w.city],
+                  ["State", w=>w.state],
+                  ["Phone", w=>w.phone],
+                  ["Email", w=>w.email],
+                  ["Skills", w=>(w.skills||[]).join("; ")],
+                  ["Experience", w=>w.experience],
+                  ["Crew Size", w=>w.crew],
+                  ["Travel Radius", w=>w.travel],
+                  ["Base Access", w=>w.bases ? "Yes" : "No"],
+                  ["Status", w=>w.status],
+                  ["Temperature", w=>w.temperature],
+                  ["Last Contacted", w=>w.last_contacted ? new Date(w.last_contacted).toLocaleString() : ""],
+                  ["Notes", w=>w.notes],
+                ]
+              )}
+              style={{...btn("ghost"),padding:"7px 14px",fontSize:12}}
+            >
+              ⬇ Export CSV ({filteredWorkers.length})
+            </button>
+          </div>
 
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
@@ -1632,7 +1682,37 @@ function AdminPortal({ token, onLogout }) {
             This list is built automatically from customers who've submitted job requests — no separate signup needed. Click a company name for company details, or a contact name for role and direct contact info.
           </div>
 
-          <input style={{...field,marginBottom:16,maxWidth:400}} value={partnerSearch} onChange={e=>setPartnerSearch(e.target.value)} placeholder="Search by company, contact, or email..."/>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
+            <input style={{...field,maxWidth:400,marginBottom:0}} value={partnerSearch} onChange={e=>setPartnerSearch(e.target.value)} placeholder="Search by company, contact, or email..."/>
+            <button
+              onClick={()=>exportToCSV(
+                `temco-partners-${new Date().toISOString().slice(0,10)}.csv`,
+                filteredPartners,
+                [
+                  ["Company", p=>p.company],
+                  ["Contact Name", p=>p.contact_name],
+                  ["Contact Type", p=>p.contact_type],
+                  ["Type Detail", p=>p.contact_type_detail],
+                  ["Position", p=>p.contact_position],
+                  ["Email", p=>p.email],
+                  ["Phone", p=>p.phone],
+                  ["Direct Phone", p=>p.contact_direct_phone],
+                  ["Company Address", p=>p.company_address],
+                  ["Company Phone", p=>p.company_phone],
+                  ["Website", p=>p.website],
+                  ["DOT/MC Number", p=>p.dot_number],
+                  ["Fleet Size", p=>p.fleet_size],
+                  ["Jobs", p=>p.jobCount],
+                  ["Total Revenue", p=>p.totalRevenue],
+                  ["Last Active", p=>p.lastActive ? p.lastActive.toLocaleDateString() : ""],
+                  ["Notes", p=>p.notes],
+                ]
+              )}
+              style={{...btn("ghost"),padding:"7px 14px",fontSize:12}}
+            >
+              ⬇ Export CSV ({filteredPartners.length})
+            </button>
+          </div>
 
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
