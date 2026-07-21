@@ -12,6 +12,19 @@ const C = {
 };
 
 const SKILL_TYPES = ["Loading","Unloading","Packing","Inventory","Assembly","Class A Driver","Crew Lead","Driving","Shuttle","Crating","Delivery"];
+// Mirrors backend BASE_RATES in routes/jobs.js — used only to show an accurate live price preview before submission
+const BASE_RATES_PREVIEW = { "Load/Unload":85, "Inventory":85, "Packing":90, "Assembly":90, "Driving":110, "Full Service":110 };
+function previewDispatchFee({ work_type, crew, date, same_day, specialty_item }) {
+  const base = BASE_RATES_PREVIEW[work_type] || 100;
+  let perWorker = base;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const reqDate = date ? new Date(date) : null;
+  const isSameDay = same_day || (reqDate && (reqDate - today) <= 86400000 && (reqDate - today) >= 0);
+  if (isSameDay) perWorker += 15;
+  let total = perWorker * (parseInt(crew) || 0);
+  if (specialty_item) total += 75;
+  return total;
+}
 const TEMP_OPTIONS = ["New","Warming Up","Reliable","Went Quiet"];
 const TEMP_COLORS = {
   "New": { bg:"#1C1F2E", color:"#60A5FA" },
@@ -213,7 +226,7 @@ function PublicHome({ onNav, workerCount, stateCount }) {
 // ─── REQUEST FORM ─────────────────────────────────────────────────────────────
 function RequestForm({ onNav, onAuth, states }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({company:"",contact:"",phone:"",email:"",password:"",location:"",state:"",zip:"",date:"",time:"",crew:"4",type:"Load/Unload",duration:"4",notes:""});
+  const [form, setForm] = useState({company:"",contact:"",phone:"",email:"",password:"",location:"",state:"",zip:"",date:"",time:"",crew:"4",type:"Load/Unload",duration:"4",notes:"",same_day:false,specialty_item:false});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -295,6 +308,8 @@ function RequestForm({ onNav, onAuth, states }) {
           work_type: form.type,
           duration_hours: parseInt(form.duration),
           special_notes: form.notes,
+          same_day: form.same_day,
+          specialty_item: form.specialty_item,
         }),
       });
       if (!jobRes.ok) {
@@ -400,6 +415,16 @@ function RequestForm({ onNav, onAuth, states }) {
             </div>
           </div>
           <div><label style={label}>Est. Duration (hours)</label><input style={field} value={form.duration} onChange={e=>up("duration",e.target.value)} placeholder="4"/></div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:8,padding:"12px 14px"}}>
+            <label style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer",fontSize:13,color:C.chalk}}>
+              <input type="checkbox" checked={form.same_day} onChange={e=>up("same_day",e.target.checked)} style={{width:16,height:16,accentColor:C.amber,cursor:"pointer"}}/>
+              Same-day / rush job <span style={{color:C.muted,fontSize:11}}>(+$15/worker — short notice)</span>
+            </label>
+            <label style={{display:"flex",alignItems:"center",gap:9,cursor:"pointer",fontSize:13,color:C.chalk}}>
+              <input type="checkbox" checked={form.specialty_item} onChange={e=>up("specialty_item",e.target.checked)} style={{width:16,height:16,accentColor:C.amber,cursor:"pointer"}}/>
+              Specialty item — piano, safe, fine art, gun safe, etc. <span style={{color:C.muted,fontSize:11}}>(+$75 flat)</span>
+            </label>
+          </div>
           <div><label style={label}>Special Requirements</label><textarea style={{...field,resize:"vertical",minHeight:72}} value={form.notes} onChange={e=>up("notes",e.target.value)} placeholder="Stairs, heavy items, military base access needed..."/></div>
         </div>
       )}
@@ -407,7 +432,7 @@ function RequestForm({ onNav, onAuth, states }) {
       {step===3 && (
         <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22}}>
           <div style={{fontSize:11,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Order Summary</div>
-          {[["Company",form.company],["Contact",form.contact],["Location",`${form.location}, ${form.state}`],["Date & Time",`${form.date} at ${form.time}`],["Crew Size",`${form.crew} workers`],["Work Type",form.type],["Duration",`${form.duration} hrs`]].map(([k,v])=>(
+          {[["Company",form.company],["Contact",form.contact],["Location",`${form.location}, ${form.state}`],["Date & Time",`${form.date} at ${form.time}`],["Crew Size",`${form.crew} workers`],["Work Type",form.type],["Duration",`${form.duration} hrs`],...(form.same_day?[["Same-Day","Yes (+$15/worker)"]]:[]),...(form.specialty_item?[["Specialty Item","Yes (+$75 flat)"]]:[])].map(([k,v])=>(
             <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
               <span style={{color:C.muted,fontSize:13}}>{k}</span>
               <span style={{color:C.chalk,fontSize:13,fontWeight:600}}>{v||"—"}</span>
@@ -415,7 +440,7 @@ function RequestForm({ onNav, onAuth, states }) {
           ))}
           <div style={{display:"flex",justifyContent:"space-between",paddingTop:14,marginTop:4}}>
             <span style={{color:C.chalk,fontWeight:700}}>Dispatch Fee</span>
-            <span style={{color:C.amber,fontWeight:900,fontSize:22}}>${parseInt(form.crew||0)*100}</span>
+            <span style={{color:C.amber,fontWeight:900,fontSize:22}}>${previewDispatchFee({work_type:form.type, crew:form.crew, date:form.date, same_day:form.same_day, specialty_item:form.specialty_item})}</span>
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:8}}>Pay workers directly on-site. TEMCO never processes payroll.</div>
           <div style={{marginTop:16,display:"flex",alignItems:"flex-start",gap:10}}>
