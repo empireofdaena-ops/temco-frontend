@@ -12,7 +12,6 @@ const C = {
 };
 
 const SKILL_TYPES = ["Loading","Unloading","Packing","Inventory","Assembly","Class A Driver","Crew Lead","Driving","Shuttle","Crating","Delivery"];
-// Mirrors backend BASE_RATES in routes/jobs.js — used only to show an accurate live price preview before submission
 const BASE_RATES_PREVIEW = { "Load/Unload":85, "Inventory":85, "Packing":90, "Assembly":90, "Driving":110, "Full Service":110 };
 function previewDispatchFee({ work_type, crew, date, same_day, specialty_item }) {
   const base = BASE_RATES_PREVIEW[work_type] || 100;
@@ -33,7 +32,6 @@ const TEMP_COLORS = {
   "Went Quiet": { bg:"#2A1A1A", color:"#EF4444" },
 };
 
-// ─── MOCK JOBS (kept as fallback/demo data for public-facing pages) ──────────
 const INITIAL_JOBS = [
   { id:"JOB-1041", customer:"Two Men and a Truck – Dallas", location:"Dallas, TX", date:"Jun 12, 2026", time:"8:00 AM", crew:4, type:"Load/Unload", status:"Confirmed", fee:400, workerIds:[] },
   { id:"JOB-1040", customer:"Atlas Van Lines", location:"Houston, TX", date:"Jun 11, 2026", time:"9:00 AM", crew:3, type:"Packing", status:"In Progress", fee:300, workerIds:[] },
@@ -42,10 +40,8 @@ const INITIAL_JOBS = [
   { id:"JOB-1042", customer:"Allied Van Lines", location:"Atlanta, GA", date:"Jun 13, 2026", time:"7:30 AM", crew:4, type:"Load/Unload", status:"Pending", fee:400, workerIds:[] },
 ];
 
-// Fallback states list used only before live data has loaded
 const FALLBACK_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
-// ─── SHARED UI ────────────────────────────────────────────────────────────────
 const field = {
   width:"100%", background:C.navyMid, border:`1px solid ${C.border}`,
   borderRadius:8, padding:"11px 14px", color:C.chalk, fontSize:14,
@@ -113,12 +109,9 @@ function Spinner() {
   );
 }
 
-// ─── CSV EXPORT HELPER ────────────────────────────────────────────────────────
-// rows: array of objects; columns: [[header, accessorFn]] — accessorFn(row) returns the cell value
 function exportToCSV(filename, rows, columns) {
   const escapeCell = (val) => {
     const s = (val === null || val === undefined) ? "" : String(val);
-    // Quote any field containing a comma, quote, or newline — and escape embedded quotes
     if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
@@ -140,7 +133,6 @@ function exportToCSV(filename, rows, columns) {
 function PublicHome({ onNav, workerCount, stateCount }) {
   return (
     <div>
-      {/* Hero */}
       <div style={{background:`linear-gradient(150deg,${C.navy} 0%,${C.navyMid} 100%)`,padding:"72px 40px 56px",textAlign:"center",borderBottom:`1px solid ${C.border}`}}>
         <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(245,166,35,0.12)",border:`1px solid ${C.amber}33`,padding:"4px 14px",borderRadius:20,marginBottom:20}}>
           <span style={{width:6,height:6,borderRadius:"50%",background:C.green,display:"inline-block"}}/>
@@ -156,7 +148,6 @@ function PublicHome({ onNav, workerCount, stateCount }) {
           <button onClick={()=>onNav("request")} style={{background:C.amber,color:C.navy,border:"none",padding:"14px 32px",borderRadius:8,fontSize:15,fontWeight:800,cursor:"pointer"}}>Request Labor Now →</button>
           <button onClick={()=>onNav("worker-signup")} style={{background:"transparent",color:C.chalk,border:`1px solid ${C.border}`,padding:"14px 28px",borderRadius:8,fontSize:15,fontWeight:600,cursor:"pointer"}}>Become a Helper</button>
         </div>
-        {/* Live stats bar */}
         <div style={{display:"flex",gap:32,justifyContent:"center",marginTop:48,flexWrap:"wrap"}}>
           {[
             {val:`${workerCount}+`, lbl:"Vetted Workers"},
@@ -172,7 +163,6 @@ function PublicHome({ onNav, workerCount, stateCount }) {
         </div>
       </div>
 
-      {/* How it works */}
       <div style={{padding:"56px 40px",maxWidth:900,margin:"0 auto"}}>
         <div style={{textAlign:"center",marginBottom:44}}>
           <div style={{fontSize:11,color:C.amber,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>The Process</div>
@@ -194,7 +184,6 @@ function PublicHome({ onNav, workerCount, stateCount }) {
         </div>
       </div>
 
-      {/* Pricing */}
       <div style={{background:C.navyMid,padding:"56px 40px",borderTop:`1px solid ${C.border}`,borderBottom:`1px solid ${C.border}`}}>
         <div style={{maxWidth:560,margin:"0 auto",textAlign:"center"}}>
           <h2 style={{fontSize:26,fontWeight:800,color:C.chalk,margin:"0 0 8px"}}>Simple, Transparent Pricing</h2>
@@ -209,7 +198,6 @@ function PublicHome({ onNav, workerCount, stateCount }) {
         </div>
       </div>
 
-      {/* Footer */}
       <div style={{padding:"32px 40px",textAlign:"center",color:C.muted,fontSize:12}}>
         <div style={{display:"flex",gap:20,justifyContent:"center",flexWrap:"wrap",marginBottom:12}}>
           <span style={{cursor:"pointer"}} onClick={()=>onNav("terms")}>Terms of Service</span>
@@ -740,7 +728,7 @@ function CustomerPortal({ token, onLogout }) {
 
 // ─── WORKER LOGIN GATE (phone + SMS one-time code) ───────────────────────────
 function WorkerLogin({ onLogin }) {
-  const [step, setStep] = useState(1); // 1 = enter phone, 2 = enter code
+  const [step, setStep] = useState(1);
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -856,6 +844,11 @@ function WorkerPortal({ token, onLogout }) {
   const [loadError, setLoadError] = useState("");
   const [availLoading, setAvailLoading] = useState(false);
 
+  // Consent gate state
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [consentSubmitting, setConsentSubmitting] = useState(false);
+  const [consentError, setConsentError] = useState("");
+
   useEffect(() => {
     let cancelled = false;
     async function loadData() {
@@ -882,6 +875,28 @@ function WorkerPortal({ token, onLogout }) {
     loadData();
     return () => { cancelled = true; };
   }, [token]);
+
+  const confirmConsent = async () => {
+    if (!consentChecked) { setConsentError("Please check the box to confirm."); return; }
+    setConsentSubmitting(true);
+    setConsentError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/worker/confirm-consent`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setWorker(prev => ({ ...prev, sms_consent_confirmed_at: data.worker.sms_consent_confirmed_at }));
+      } else {
+        setConsentError(data.error || "Could not save your confirmation. Please try again.");
+      }
+    } catch (e) {
+      setConsentError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setConsentSubmitting(false);
+    }
+  };
 
   const toggleAvailability = async () => {
     if (!worker) return;
@@ -916,6 +931,7 @@ function WorkerPortal({ token, onLogout }) {
   })), [jobs]);
 
   const isAvailable = worker?.status === "active";
+  const needsConsent = worker && !worker.sms_consent_confirmed_at;
 
   return (
     <div style={{padding:"30px"}}>
@@ -931,8 +947,40 @@ function WorkerPortal({ token, onLogout }) {
       )}
 
       {loading ? <Spinner/> : worker && (
+        needsConsent ? (
+          <div style={{maxWidth:520,margin:"20px auto"}}>
+            <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:14,padding:32}}>
+              <div style={{fontSize:13,color:C.amber,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>One More Step</div>
+              <h2 style={{fontSize:20,fontWeight:800,color:C.chalk,margin:"0 0 14px"}}>Confirm Text Message Consent</h2>
+              <p style={{fontSize:13,color:C.muted,lineHeight:1.7,marginBottom:20}}>
+                Before you can receive job offers, please confirm you agree to receive SMS messages from TEMCO.
+              </p>
+              <div style={{background:C.navyLight,border:`1px solid ${C.border}`,borderRadius:10,padding:18,marginBottom:20}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                  <input
+                    type="checkbox"
+                    id="sms-consent"
+                    checked={consentChecked}
+                    onChange={e=>setConsentChecked(e.target.checked)}
+                    style={{marginTop:2,accentColor:C.amber,width:16,height:16,flexShrink:0,cursor:"pointer"}}
+                  />
+                  <label htmlFor="sms-consent" style={{fontSize:13,color:C.chalk,lineHeight:1.6,cursor:"pointer"}}>
+                    I agree to receive SMS messages from TEMCO National Labor Dispatch, including job alerts and dispatch notifications. Message and data rates may apply. Message frequency varies. Reply STOP at any time to opt out, HELP for help.
+                  </label>
+                </div>
+              </div>
+              {consentError && <div style={{color:C.red,fontSize:12,marginBottom:14}}>{consentError}</div>}
+              <button
+                onClick={confirmConsent}
+                disabled={consentSubmitting || !consentChecked}
+                style={{...btn(),width:"100%",padding:"13px",fontSize:14,opacity:(consentSubmitting||!consentChecked)?0.6:1}}
+              >
+                {consentSubmitting ? "Saving..." : "Confirm & Continue →"}
+              </button>
+            </div>
+          </div>
+        ) : (
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:22,flexWrap:"wrap"}}>
-        {/* Profile card */}
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22}}>
             <div style={{width:54,height:54,borderRadius:"50%",background:C.amber,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:900,color:C.navy,marginBottom:14}}>
@@ -948,7 +996,6 @@ function WorkerPortal({ token, onLogout }) {
               </div>
             )}
           </div>
-          {/* Availability toggle */}
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:18}}>
             <div style={{fontSize:11,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:12}}>Availability</div>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -960,7 +1007,6 @@ function WorkerPortal({ token, onLogout }) {
           </div>
         </div>
 
-        {/* Job history */}
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22}}>
             <div style={{fontWeight:700,color:C.chalk,marginBottom:16}}>Your Job Offers</div>
@@ -985,7 +1031,6 @@ function WorkerPortal({ token, onLogout }) {
             ))}
           </div>
 
-          {/* How it works for workers */}
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22}}>
             <div style={{fontWeight:700,color:C.chalk,marginBottom:14}}>How TEMCO Works for You</div>
             {[
@@ -1004,6 +1049,7 @@ function WorkerPortal({ token, onLogout }) {
           </div>
         </div>
       </div>
+        )
       )}
     </div>
   );
@@ -1089,20 +1135,17 @@ function AdminPortal({ token, onLogout }) {
   const [actionLoading, setActionLoading] = useState({});
   const [actionResults, setActionResults] = useState({});
 
-  // ── Worker notes editing state ──
   const [expandedWorkerId, setExpandedWorkerId] = useState(null);
   const [workerNotesDraft, setWorkerNotesDraft] = useState({});
   const [workerTempDraft, setWorkerTempDraft] = useState({});
   const [workerNoteSaving, setWorkerNoteSaving] = useState({});
   const [workerNoteResult, setWorkerNoteResult] = useState({});
 
-  // ── Partner (company/contact) detail editing state ──
-  const [expandedPartnerSection, setExpandedPartnerSection] = useState(null); // `${customerId}:company` or `${customerId}:contact`
+  const [expandedPartnerSection, setExpandedPartnerSection] = useState(null);
   const [partnerDraft, setPartnerDraft] = useState({});
   const [partnerSaving, setPartnerSaving] = useState({});
   const [partnerSaveResult, setPartnerSaveResult] = useState({});
 
-  // ── Today / To-Do list state ──
   const [todos, setTodos] = useState([]);
   const [todosLoading, setTodosLoading] = useState(true);
   const [todosLoadError, setTodosLoadError] = useState("");
@@ -1218,7 +1261,6 @@ function AdminPortal({ token, onLogout }) {
     } catch(e) { console.error("No-show update failed", e); }
   };
 
-  // ── Save worker relationship note ──
   const handleSaveWorkerNote = async (workerId) => {
     setWorkerNoteSaving(prev => ({...prev, [workerId]: true}));
     setWorkerNoteResult(prev => ({...prev, [workerId]: ""}));
@@ -1242,8 +1284,6 @@ function AdminPortal({ token, onLogout }) {
     }
   };
 
-  // ── Save partner (company or contact) details ──
-  // fields: object with only the keys relevant to whichever section (company/contact) was edited
   const handleSavePartnerDetails = async (customerId, fields) => {
     if (!customerId) {
       setPartnerSaveResult(prev => ({...prev, [expandedPartnerSection]: "No customer ID on file for this partner — cannot save yet."}));
@@ -1284,7 +1324,6 @@ function AdminPortal({ token, onLogout }) {
     }
   };
 
-  // ── To-Do list: load, add, toggle, delete ──
   useEffect(() => {
     let cancelled = false;
     async function loadTodos() {
@@ -1398,7 +1437,6 @@ function AdminPortal({ token, onLogout }) {
         });
         if (!res.ok) throw new Error(`Server responded ${res.status}`);
         const data = await res.json();
-        // Backend may return either a raw array or { workers: [...], total }
         const list = Array.isArray(data) ? data : (data.workers || data.data || []);
         if (!cancelled) setWorkers(list);
       } catch (e) {
@@ -1411,7 +1449,6 @@ function AdminPortal({ token, onLogout }) {
     return () => { cancelled = true; };
   }, [token]);
 
-  // Normalize fields since the live DB schema differs slightly from old mock shape
   const normalizedWorkers = useMemo(() => workers.map(w => ({
     id: w.id,
     name: w.name || "—",
@@ -1461,7 +1498,6 @@ function AdminPortal({ token, onLogout }) {
 
   const totalFees = normalizedJobs.reduce((a,j)=>a+(j.fee||0),0);
 
-  // ── PARTNERS/CONTACTS: derived from existing job/customer data (no new API call needed) ──
   const partners = useMemo(() => {
     const map = {};
     liveJobs.forEach(j => {
@@ -1478,13 +1514,11 @@ function AdminPortal({ token, onLogout }) {
           jobCount: 0,
           totalRevenue: 0,
           lastActive: null,
-          // Extended company details
           company_address: j.company_address || "",
           company_phone: j.company_phone || "",
           website: j.website || "",
           dot_number: j.dot_number || "",
           fleet_size: j.fleet_size || "",
-          // Extended contact details
           contact_position: j.contact_position || "",
           contact_direct_phone: j.contact_direct_phone || "",
           contact_type: j.contact_type || "",
@@ -1513,7 +1547,6 @@ function AdminPortal({ token, onLogout }) {
     );
   }, [partners, partnerSearch]);
 
-  // ── TODAY BRIEFING: derived from data already loaded, no extra API calls ──
   const jobsNeedingAction = useMemo(() =>
     normalizedJobs.filter(j => ["Pending","Dispatching"].includes(j.status))
   , [normalizedJobs]);
@@ -1558,7 +1591,6 @@ function AdminPortal({ token, onLogout }) {
 
       {(loading || jobsLoading) ? <Spinner/> : (
       <>
-      {/* ── TODAY ── */}
       {tab==="today" && (
         <div>
           <div style={{display:"flex",gap:14,marginBottom:24,flexWrap:"wrap"}}>
@@ -1569,7 +1601,6 @@ function AdminPortal({ token, onLogout }) {
           </div>
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
-            {/* Jobs needing action */}
             <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20}}>
               <div style={{fontWeight:700,color:C.chalk,marginBottom:12}}>📋 Jobs Needing Action</div>
               {jobsNeedingAction.length===0 ? (
@@ -1586,7 +1617,6 @@ function AdminPortal({ token, onLogout }) {
               {jobsNeedingAction.length>8 && <div style={{fontSize:11,color:C.muted,marginTop:8}}>+{jobsNeedingAction.length-8} more — see All Jobs tab</div>}
             </div>
 
-            {/* Workers gone quiet */}
             <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20}}>
               <div style={{fontWeight:700,color:C.chalk,marginBottom:12}}>🥶 Workers Gone Quiet</div>
               {workersWentQuiet.length===0 ? (
@@ -1603,7 +1633,6 @@ function AdminPortal({ token, onLogout }) {
               {workersWentQuiet.length>8 && <div style={{fontSize:11,color:C.muted,marginTop:8}}>+{workersWentQuiet.length-8} more — see Workers tab</div>}
             </div>
 
-            {/* Never contacted workers */}
             <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20}}>
               <div style={{fontWeight:700,color:C.chalk,marginBottom:12}}>📱 Workers Never Contacted</div>
               {workersNeverContacted.length===0 ? (
@@ -1615,7 +1644,6 @@ function AdminPortal({ token, onLogout }) {
               )}
             </div>
 
-            {/* Partners to check in on */}
             <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20}}>
               <div style={{fontWeight:700,color:C.chalk,marginBottom:12}}>🤝 Partners to Check In On</div>
               {partnersNeedingCheckIn.length===0 ? (
@@ -1633,7 +1661,6 @@ function AdminPortal({ token, onLogout }) {
             </div>
           </div>
 
-          {/* Manual to-do list */}
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20}}>
             <div style={{fontWeight:700,color:C.chalk,marginBottom:14}}>✏️ To-Do List</div>
             <div style={{display:"flex",gap:8,marginBottom:16}}>
@@ -1678,7 +1705,6 @@ function AdminPortal({ token, onLogout }) {
         </div>
       )}
 
-      {/* ── OVERVIEW ── */}
       {tab==="overview" && (
         <div>
           <div style={{display:"flex",gap:14,marginBottom:24,flexWrap:"wrap"}}>
@@ -1688,7 +1714,6 @@ function AdminPortal({ token, onLogout }) {
             <StatCard label="Fill Rate" value="97%" color={C.green}/>
           </div>
 
-          {/* Live jobs */}
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22,marginBottom:20}}>
             <div style={{fontWeight:700,color:C.chalk,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
               <span>Live Dispatch Activity</span>
@@ -1710,7 +1735,6 @@ function AdminPortal({ token, onLogout }) {
             ))}
           </div>
 
-          {/* Workers by state */}
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22}}>
             <div style={{fontWeight:700,color:C.chalk,marginBottom:16}}>Network Coverage by State</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8}}>
@@ -1725,7 +1749,6 @@ function AdminPortal({ token, onLogout }) {
         </div>
       )}
 
-      {/* ── WORKERS ── */}
       {tab==="workers" && (
         <div>
           <div style={{display:"flex",gap:14,marginBottom:20,flexWrap:"wrap"}}>
@@ -1736,7 +1759,6 @@ function AdminPortal({ token, onLogout }) {
             <StatCard label="Went Quiet" value={normalizedWorkers.filter(w=>w.temperature==="Went Quiet").length} color={C.red}/>
           </div>
 
-          {/* Filters */}
           <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
             <input style={{...field,flex:2,minWidth:160}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name, city, or notes..."/>
             <select style={{...field,flex:1,minWidth:100}} value={stateFilter} onChange={e=>setStateFilter(e.target.value)}>
@@ -1852,7 +1874,6 @@ function AdminPortal({ token, onLogout }) {
         </div>
       )}
 
-      {/* ── ALL JOBS ── */}
       {tab==="jobs" && (
         <div>
           <div style={{display:"flex",gap:14,marginBottom:20,flexWrap:"wrap"}}>
@@ -1864,7 +1885,6 @@ function AdminPortal({ token, onLogout }) {
           {normalizedJobs.length===0 && <div style={{padding:30,color:C.muted,fontSize:13,textAlign:"center"}}>No jobs yet. Submitted requests will appear here.</div>}
           {normalizedJobs.map(j=>(
             <div key={j.rawId} style={{background:C.navyMid,border:`1px solid ${expandedJobId===j.rawId?C.amber:C.border}`,borderRadius:10,marginBottom:10,overflow:"hidden",transition:"border-color 0.2s"}}>
-              {/* Job row — click to expand */}
               <div onClick={()=>handleExpandJob(j)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",flexWrap:"wrap",gap:10,cursor:"pointer"}}>
                 <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
                   <span style={{color:C.amber,fontWeight:800,fontSize:14}}>{j.id}</span>
@@ -1880,10 +1900,8 @@ function AdminPortal({ token, onLogout }) {
                 </div>
               </div>
 
-              {/* Expanded panel */}
               {expandedJobId===j.rawId && (
                 <div style={{borderTop:`1px solid ${C.border}`,padding:"18px 18px"}}>
-                  {/* Action buttons */}
                   <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
                     <button onClick={()=>handleReleaseCrewManually(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.green,color:"white",border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
                       📤 Release Crew to Customer
@@ -1903,14 +1921,12 @@ function AdminPortal({ token, onLogout }) {
                     )}
                   </div>
 
-                  {/* Action result */}
                   {actionResults[j.rawId] && (
                     <div style={{fontSize:12,color:actionResults[j.rawId].startsWith("✓")?C.green:actionResults[j.rawId].startsWith("⚠")?C.amber:C.red,marginBottom:14,padding:"8px 14px",background:C.navyLight,borderRadius:6,fontWeight:600}}>
                       {actionResults[j.rawId]}
                     </div>
                   )}
 
-                  {/* Workers */}
                   <div style={{fontSize:11,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:10}}>Assigned Workers</div>
                   {!jobWorkers[j.rawId] ? (
                     <div style={{color:C.muted,fontSize:13}}>Loading...</div>
@@ -1952,7 +1968,6 @@ function AdminPortal({ token, onLogout }) {
         </div>
       )}
 
-      {/* ── PARTNERS / CONTACTS ── */}
       {tab==="partners" && (
         <div>
           <div style={{display:"flex",gap:14,marginBottom:20,flexWrap:"wrap"}}>
@@ -2101,7 +2116,6 @@ function AdminPortal({ token, onLogout }) {
         </div>
       )}
 
-      {/* ── DISPATCH SIM ── */}
       {tab==="dispatch" && <DispatchSim workers={normalizedWorkers} states={STATES} />}
       </>
       )}
@@ -2362,8 +2376,6 @@ export default function App() {
   const [customerToken, setCustomerToken] = useState(() => localStorage.getItem('temco_customer_token'));
   const [workerToken, setWorkerToken] = useState(() => localStorage.getItem('temco_worker_token'));
 
-  // Real URL navigation: updates the address bar (so links are shareable/bookmarkable)
-  // and keeps browser back/forward working correctly.
   const navigate = (newPage) => {
     const path = pathForPage(newPage);
     if (window.location.pathname !== path) {
@@ -2372,7 +2384,6 @@ export default function App() {
     setPage(newPage);
   };
 
-  // Sync page state with the actual URL on load and on back/forward navigation
   useEffect(() => {
     setPage(pageForPath(window.location.pathname));
     const onPopState = () => setPage(pageForPath(window.location.pathname));
@@ -2442,7 +2453,6 @@ export default function App() {
     <div style={{minHeight:"100vh",background:C.navy,color:C.chalk,fontFamily:"'Space Grotesk','Inter',sans-serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 
-      {/* Nav */}
       <nav style={{background:C.navy,borderBottom:`1px solid ${C.border}`,padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,position:"sticky",top:0,zIndex:100,flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:16}}>
           <div onClick={()=>navigate("home")} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
