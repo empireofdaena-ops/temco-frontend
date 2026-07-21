@@ -1156,6 +1156,29 @@ function AdminPortal({ token, onLogout }) {
     }
   };
 
+  const handleMarkCompleted = async (jobId) => {
+    if (!window.confirm("Mark this job as Completed? This will also text the customer a one-time follow-up invite.")) return;
+    setActionLoading(prev => ({...prev, [jobId]: true}));
+    try {
+      const res = await fetch(`${API_BASE}/api/jobs/${jobId}/status`, {
+        method: "PATCH",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Completed" })
+      });
+      if (res.ok) {
+        setLiveJobs(prev => prev.map(j => j.id === jobId ? {...j, status: "Completed"} : j));
+        setActionResults(prev => ({...prev, [jobId]: "✓ Job marked Completed — follow-up text sent to customer."}));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setActionResults(prev => ({...prev, [jobId]: `Error: ${data.error || "Could not update job"}`}));
+      }
+    } catch(e) {
+      setActionResults(prev => ({...prev, [jobId]: "Could not reach server"}));
+    } finally {
+      setActionLoading(prev => ({...prev, [jobId]: false}));
+    }
+  };
+
   const handleNoShow = async (jobId, workerId, workerName) => {
     if (!window.confirm(`Mark ${workerName} as a no-show? This will reduce their dispatch priority.`)) return;
     try {
@@ -1843,6 +1866,11 @@ function AdminPortal({ token, onLogout }) {
                     <button onClick={()=>handleRedispatch(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.blue,color:"white",border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
                       🔄 Re-Dispatch More Workers
                     </button>
+                    {j.status!=="Cancelled" && j.status!=="Completed" && (
+                      <button onClick={()=>handleMarkCompleted(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.amber,color:C.navy,border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
+                        ✓ Mark Completed
+                      </button>
+                    )}
                     {j.status!=="Cancelled" && j.status!=="Completed" && (
                       <button onClick={()=>handleCancelJob(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:"transparent",color:C.red,border:`1px solid ${C.red}66`,padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
                         ✕ Cancel Job
