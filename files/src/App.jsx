@@ -32,14 +32,6 @@ const TEMP_COLORS = {
   "Went Quiet": { bg:"#2A1A1A", color:"#EF4444" },
 };
 
-const INITIAL_JOBS = [
-  { id:"JOB-1041", customer:"Two Men and a Truck – Dallas", location:"Dallas, TX", date:"Jun 12, 2026", time:"8:00 AM", crew:4, type:"Load/Unload", status:"Confirmed", fee:400, workerIds:[] },
-  { id:"JOB-1040", customer:"Atlas Van Lines", location:"Houston, TX", date:"Jun 11, 2026", time:"9:00 AM", crew:3, type:"Packing", status:"In Progress", fee:300, workerIds:[] },
-  { id:"JOB-1039", customer:"U-Pack Brokers", location:"Phoenix, AZ", date:"Jun 10, 2026", time:"7:00 AM", crew:2, type:"Loading", status:"Completed", fee:200, workerIds:[] },
-  { id:"JOB-1038", customer:"Mayflower Transit", location:"Chicago, IL", date:"Jun 9, 2026", time:"8:00 AM", crew:5, type:"Full Service", status:"Completed", fee:500, workerIds:[] },
-  { id:"JOB-1042", customer:"Allied Van Lines", location:"Atlanta, GA", date:"Jun 13, 2026", time:"7:30 AM", crew:4, type:"Load/Unload", status:"Pending", fee:400, workerIds:[] },
-];
-
 const FALLBACK_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
 const field = {
