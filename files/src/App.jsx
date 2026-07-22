@@ -454,6 +454,7 @@ function RequestForm({ onNav, onAuth, states }) {
 // ─── WORKER SIGNUP ────────────────────────────────────────────────────────────
 function WorkerSignup({ states }) {
   const [form, setForm] = useState({name:"",phone:"",email:"",city:"",state:"",skills:[],experience:"",notes:""});
+  const [smsConsent, setSmsConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -461,13 +462,17 @@ function WorkerSignup({ states }) {
   const toggleSkill = s => setForm(p=>({...p,skills:p.skills.includes(s)?p.skills.filter(x=>x!==s):[...p.skills,s]}));
 
   const handleSubmit = async () => {
+    if (!smsConsent) {
+      setError("You must check the box agreeing to receive SMS messages from TEMCO to apply.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
       const res = await fetch(`${API_BASE}/api/workers/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, sms_consent: smsConsent }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -525,13 +530,20 @@ function WorkerSignup({ states }) {
         </div>
         <div><label style={label}>Notes / Equipment / Crew Size</label><textarea style={{...field,resize:"vertical",minHeight:72}} value={form.notes} onChange={e=>up("notes",e.target.value)} placeholder="Own tools, dollies, travel radius, crew size..."/></div>
         <div style={{display:"flex",alignItems:"flex-start",gap:10,marginTop:4}}>
-          <input type="checkbox" id="worker-tos" style={{marginTop:2,accentColor:C.amber,width:16,height:16,flexShrink:0}} required/>
+          <input
+            type="checkbox"
+            id="worker-tos"
+            checked={smsConsent}
+            onChange={e=>setSmsConsent(e.target.checked)}
+            style={{marginTop:2,accentColor:C.amber,width:16,height:16,flexShrink:0,cursor:"pointer"}}
+            required
+          />
           <label htmlFor="worker-tos" style={{fontSize:12,color:C.muted,lineHeight:1.5,cursor:"pointer"}}>
-            I agree to TEMCO's <span style={{color:C.amber}}>Worker Agreement</span> and understand I am joining as an independent contractor. I consent to receive automated SMS job offers from TEMCO. Reply STOP to any message to opt out.
+            I agree to TEMCO's <span style={{color:C.amber}}>Worker Agreement</span> and understand I am joining as an independent contractor. I consent to receive automated SMS job offers from TEMCO, including job alerts and dispatch notifications. Message and data rates may apply. Message frequency varies. Reply STOP to any message to opt out, HELP for help.
           </label>
         </div>
         {error && <div style={{color:C.red,fontSize:12}}>{error}</div>}
-        <button onClick={handleSubmit} disabled={submitting} style={{...btn(),padding:"13px",fontSize:14,marginTop:4,opacity:submitting?0.6:1}}>
+        <button onClick={handleSubmit} disabled={submitting || !smsConsent} style={{...btn(),padding:"13px",fontSize:14,marginTop:4,opacity:(submitting||!smsConsent)?0.6:1}}>
           {submitting ? "Submitting..." : "Submit Application →"}
         </button>
       </div>
