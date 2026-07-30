@@ -24,6 +24,24 @@ function previewDispatchFee({ work_type, crew, date, same_day, specialty_item })
   if (specialty_item) total += 75;
   return total;
 }
+
+// Minimum notice required for a request — currently booking 48+ hours out while
+// dispatch is monitored manually. Returns the earliest bookable date as YYYY-MM-DD.
+const MIN_NOTICE_HOURS = 48;
+function getMinBookableDate() {
+  const min = new Date();
+  min.setHours(min.getHours() + MIN_NOTICE_HOURS);
+  return min.toISOString().slice(0, 10);
+}
+function isDateTooSoon(dateStr) {
+  if (!dateStr) return false;
+  const min = new Date();
+  min.setHours(min.getHours() + MIN_NOTICE_HOURS);
+  min.setHours(0,0,0,0);
+  const chosen = new Date(dateStr);
+  chosen.setHours(0,0,0,0);
+  return chosen < min;
+}
 const TEMP_OPTIONS = ["New","Warming Up","Reliable","Went Quiet"];
 const TEMP_COLORS = {
   "New": { bg:"#1C1F2E", color:"#60A5FA" },
@@ -244,6 +262,10 @@ function RequestForm({ onNav, onAuth, states }) {
       setSubmitError("Please enter a password of at least 6 characters — this creates your account so you can track this job later.");
       return;
     }
+    if (isDateTooSoon(form.date)) {
+      setSubmitError(`We're currently booking jobs at least ${MIN_NOTICE_HOURS} hours in advance. For urgent same-day needs, please text us directly at (347) 835-4479.`);
+      return;
+    }
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -380,7 +402,15 @@ function RequestForm({ onNav, onAuth, states }) {
             <div><label style={label}>ZIP</label><input style={field} value={form.zip} onChange={e=>up("zip",e.target.value)} placeholder="75201"/></div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            <div><label style={label}>Date</label><input type="date" style={field} value={form.date} onChange={e=>up("date",e.target.value)}/></div>
+            <div>
+              <label style={label}>Date</label>
+              <input type="date" style={field} min={getMinBookableDate()} value={form.date} onChange={e=>up("date",e.target.value)}/>
+              <div style={{fontSize:11,color:isDateTooSoon(form.date)?C.red:C.muted,marginTop:5}}>
+                {isDateTooSoon(form.date)
+                  ? `Please choose a date at least ${MIN_NOTICE_HOURS} hours out — for urgent same-day needs, text us directly at (347) 835-4479.`
+                  : `Currently booking jobs ${MIN_NOTICE_HOURS}+ hours in advance.`}
+              </div>
+            </div>
             <div><label style={label}>Start Time</label><input type="time" style={field} value={form.time} onChange={e=>up("time",e.target.value)}/></div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
