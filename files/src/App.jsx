@@ -211,6 +211,7 @@ function RequestForm({ onNav, onAuth, states }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [createdJob, setCreatedJob] = useState(null);
+  const [authToken, setAuthToken] = useState(null);
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState("");
   const up = (k,v) => setForm(p=>({...p,[k]:v}));
@@ -221,7 +222,7 @@ function RequestForm({ onNav, onAuth, states }) {
     try {
       const res = await fetch(`${API_BASE}/api/payments/create-checkout`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authToken}` },
         body: JSON.stringify({ jobId: createdJob.id })
       });
       if (!res.ok) throw new Error("Payment session failed");
@@ -266,6 +267,7 @@ function RequestForm({ onNav, onAuth, states }) {
         }
         token = (await loginRes.json()).token;
         onAuth(token);
+        setAuthToken(token);
       } else if (!registerRes.ok) {
         setSubmitError("Could not create your account. Please check your details and try again.");
         setSubmitting(false);
@@ -273,6 +275,7 @@ function RequestForm({ onNav, onAuth, states }) {
       } else {
         token = (await registerRes.json()).token;
         onAuth(token);
+        setAuthToken(token);
       }
 
       const jobRes = await fetch(`${API_BASE}/api/jobs`, {
