@@ -4,11 +4,13 @@ import { useState, useMemo, useEffect, Fragment } from "react";
 const API_BASE = "https://temco-backend-production.up.railway.app";
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
+// Light, premium theme with a single confident orange accent — used consistently
+// across the marketing pages, all forms, and the Admin/Worker/Customer dashboards.
 const C = {
-  navy: "#0B1220", navyMid: "#141D30", navyLight: "#1E2D47",
-  amber: "#F5A623", amberDim: "#C4841C",
-  green: "#22C55E", red: "#EF4444", blue: "#60A5FA",
-  chalk: "#F0EDE8", muted: "#8A96A8", border: "#243044",
+  navy: "#FAFAF9", navyMid: "#FFFFFF", navyLight: "#F6F4EF",
+  amber: "#FF5A1F", amberDim: "#E0450F",
+  green: "#16A34A", red: "#DC2626", blue: "#2563EB",
+  chalk: "#1A1D23", muted: "#5B6270", grayLight: "#9CA3AF", border: "#E7E7E5",
 };
 
 const SKILL_TYPES = ["Loading","Unloading","Packing","Inventory","Assembly","Class A Driver","Crew Lead","Driving","Shuttle","Crating","Delivery"];
@@ -44,10 +46,10 @@ function isDateTooSoon(dateStr) {
 }
 const TEMP_OPTIONS = ["New","Warming Up","Reliable","Went Quiet"];
 const TEMP_COLORS = {
-  "New": { bg:"#1C1F2E", color:"#60A5FA" },
-  "Warming Up": { bg:"#2A2410", color:"#F5A623" },
-  "Reliable": { bg:"#163B2A", color:"#22C55E" },
-  "Went Quiet": { bg:"#2A1A1A", color:"#EF4444" },
+  "New": { bg:"#EFF6FF", color:"#2563EB" },
+  "Warming Up": { bg:"#FFF3E6", color:"#C2410C" },
+  "Reliable": { bg:"#E9F9EF", color:"#16A34A" },
+  "Went Quiet": { bg:"#FDECEA", color:"#DC2626" },
 };
 
 const FALLBACK_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -60,20 +62,20 @@ const field = {
 const label = { fontSize:11, color:C.muted, fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:5, display:"block" };
 const btn = (variant="primary") => ({
   background: variant==="primary" ? C.amber : variant==="ghost" ? "transparent" : C.navyLight,
-  color: variant==="primary" ? C.navy : C.chalk,
+  color: C.chalk,
   border: variant==="ghost" ? `1px solid ${C.border}` : "none",
   padding:"10px 20px", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer"
 });
 
 function Badge({ status }) {
   const map = {
-    Available:{bg:"#163B2A",color:C.green}, Pending:{bg:"#1C1F2E",color:C.blue}, pending:{bg:"#1C1F2E",color:C.blue},
-    "On Job":{bg:"#1A2E0A",color:"#86EFAC"}, Unavailable:{bg:"#2A1A1A",color:C.red},
-    Confirmed:{bg:"#163B2A",color:C.green}, "In Progress":{bg:"#1A2500",color:C.amber},
-    Completed:{bg:"#1A1A2E",color:C.muted}, Active:{bg:"#163B2A",color:C.green}, active:{bg:"#163B2A",color:C.green},
-    Cancelled:{bg:"#2A1A1A",color:C.red}, Dispatching:{bg:"#1A2500",color:C.amber},
+    Available:{bg:"#E9F9EF",color:C.green}, Pending:{bg:"#EFF6FF",color:C.blue}, pending:{bg:"#EFF6FF",color:C.blue},
+    "On Job":{bg:"#E9F9EF",color:"#15803D"}, Unavailable:{bg:"#FDECEA",color:C.red},
+    Confirmed:{bg:"#E9F9EF",color:C.green}, "In Progress":{bg:"#FFF3E6",color:C.amberDim},
+    Completed:{bg:"#F3F4F6",color:C.muted}, Active:{bg:"#E9F9EF",color:C.green}, active:{bg:"#E9F9EF",color:C.green},
+    Cancelled:{bg:"#FDECEA",color:C.red}, Dispatching:{bg:"#FFF3E6",color:C.amberDim},
   };
-  const s = map[status] || {bg:"#222",color:"#aaa"};
+  const s = map[status] || {bg:"#F3F4F6",color:C.muted};
   return <span style={{background:s.bg,color:s.color,padding:"2px 10px",borderRadius:20,fontSize:10,fontWeight:800,letterSpacing:"0.06em",textTransform:"uppercase"}}>{status}</span>;
 }
 
@@ -102,7 +104,7 @@ function Tabs({ tabs, active, onChange }) {
       {tabs.map(([k,l]) => (
         <button key={k} onClick={()=>onChange(k)} style={{
           padding:"7px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",border:"none",
-          background:active===k?C.amber:"transparent",color:active===k?C.navy:C.muted
+          background:active===k?C.amber:"transparent",color:active===k?C.chalk:C.muted
         }}>{l}</button>
       ))}
     </div>
@@ -140,105 +142,75 @@ function exportToCSV(filename, rows, columns) {
 }
 
 // ─── PUBLIC HOME ──────────────────────────────────────────────────────────────
-// Design tokens scoped to the marketing pages only (premium, conversion-focused —
-// near-black + orange accent) — separate from the C tokens used by the operational
-// dashboards below, so this redesign doesn't affect Admin/Worker/Customer portal styling.
-const PH = {
-  ink: "#14161A", inkSoft: "#1D2026", white: "#FFFFFF", offwhite: "#FAFAF9",
-  orange: "#FF5A1F", orangeDeep: "#E0450F", green: "#16A34A",
-  gray: "#6B7280", grayLight: "#9CA3AF", line: "#E7E7E5",
-};
-
 function PublicHome({ onNav, workerCount, stateCount }) {
   return (
     <div>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 
       {/* HERO */}
-      <div style={{background:PH.offwhite,padding:"100px 56px 0"}}>
+      <div style={{background:C.navy,padding:"96px 56px 0"}}>
         <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
-          <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"#FFF0E9",color:PH.orangeDeep,fontSize:13.5,fontWeight:700,padding:"8px 18px",borderRadius:20,marginBottom:32}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"#FFF0E9",color:C.amberDim,fontSize:13.5,fontWeight:700,padding:"8px 18px",borderRadius:20,marginBottom:32}}>
             Last-minute labor gaps cost you the job — not with TEMCO
           </div>
-          <h1 style={{fontFamily:"'Inter',sans-serif",fontSize:"clamp(40px,5vw,60px)",fontWeight:900,lineHeight:1.08,letterSpacing:"-0.02em",color:PH.ink,margin:"0 0 24px"}}>
-            A confirmed moving crew,<br/><span style={{color:PH.orange}}>in minutes — not days.</span>
+          <h1 style={{fontFamily:"'Inter',sans-serif",fontSize:"clamp(40px,5vw,58px)",fontWeight:900,lineHeight:1.08,letterSpacing:"-0.02em",color:C.chalk,margin:"0 0 24px"}}>
+            A confirmed moving crew,<br/><span style={{color:C.amber}}>in minutes — not days.</span>
           </h1>
-          <p style={{fontSize:18,color:PH.gray,lineHeight:1.6,maxWidth:580,margin:"0 auto 40px"}}>
+          <p style={{fontSize:18,color:C.muted,lineHeight:1.6,maxWidth:580,margin:"0 auto 40px"}}>
             TEMCO matches your job with vetted, local moving labor across all {stateCount} states — no cold calls, no group chats, no guesswork. Just a confirmed crew, fast.
           </p>
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,marginBottom:64}}>
-            <button onClick={()=>onNav("request")} style={{background:PH.orange,color:PH.white,fontSize:17,fontWeight:800,padding:"18px 44px",border:"none",borderRadius:10,cursor:"pointer",boxShadow:"0 8px 24px rgba(255,90,31,0.32)"}}>Request Your Crew Now →</button>
-            <div style={{fontSize:13.5,color:PH.gray,fontWeight:500}}>No crew confirmed, <strong style={{color:PH.ink}}>no charge</strong> — average match time under 10 minutes.</div>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,marginBottom:72}}>
+            <button onClick={()=>onNav("request")} style={{background:C.amber,color:C.chalk,fontSize:17,fontWeight:800,padding:"18px 44px",border:"none",borderRadius:10,cursor:"pointer",boxShadow:"0 8px 24px rgba(255,90,31,0.28)"}}>Request Your Crew Now →</button>
+            <div style={{fontSize:13.5,color:C.muted,fontWeight:500}}>No crew confirmed, <strong style={{color:C.chalk}}>no charge</strong> — average match time under 10 minutes.</div>
           </div>
         </div>
       </div>
 
-      {/* SOCIAL PROOF STRIP */}
-      <div style={{background:PH.ink,padding:"30px 56px",display:"flex",justifyContent:"center",gap:80,flexWrap:"wrap"}}>
-        {[[`${workerCount}+`,"Active workers"],[`${stateCount}`,"States covered"],["97%","Fill rate"],["<10 min","Avg. match time"]].map(([num,label])=>(
-          <div key={label} style={{textAlign:"center",minWidth:90}}>
-            <div style={{fontSize:27,fontWeight:800,color:PH.white}}>{num}</div>
-            <div style={{fontSize:12,color:"#9BA1AC",marginTop:4,letterSpacing:"0.02em"}}>{label}</div>
+      {/* SOCIAL PROOF — light, high-contrast strip */}
+      <div style={{background:C.navyMid,borderTop:`1px solid ${C.border}`,borderBottom:`1px solid ${C.border}`,padding:"36px 56px",display:"flex",justifyContent:"center",flexWrap:"wrap"}}>
+        {[[`${workerCount}+`,"Active workers"],[`${stateCount}`,"States covered"],["97%","Fill rate"],["<10 min","Avg. match time"]].map(([num,label],i,arr)=>(
+          <div key={label} style={{textAlign:"center",padding:"0 44px",borderRight:i<arr.length-1?`1px solid ${C.border}`:"none"}}>
+            <div style={{fontSize:28,fontWeight:800,color:C.chalk}}>{num}</div>
+            <div style={{fontSize:12.5,color:C.grayLight,marginTop:5,fontWeight:500}}>{label}</div>
           </div>
         ))}
       </div>
 
       {/* GUARANTEE STRIP */}
-      <div style={{background:PH.white,borderBottom:`1px solid ${PH.line}`,padding:"22px 56px",display:"flex",justifyContent:"center",gap:48,flexWrap:"wrap"}}>
+      <div style={{background:C.navyLight,padding:"22px 56px",display:"flex",justifyContent:"center",gap:48,flexWrap:"wrap"}}>
         {["No membership or setup fee","Pay only when your crew is confirmed","Workers paid on-site — no payroll to manage"].map(t=>(
-          <div key={t} style={{display:"flex",alignItems:"center",gap:10,fontSize:14,fontWeight:600,color:PH.ink}}>
-            <span style={{width:20,height:20,background:"#E9F9EF",color:PH.green,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,flexShrink:0}}>✓</span>
+          <div key={t} style={{display:"flex",alignItems:"center",gap:10,fontSize:14,fontWeight:600,color:C.chalk}}>
+            <span style={{width:20,height:20,background:C.navyMid,color:C.green,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,flexShrink:0,boxShadow:`0 0 0 1.5px ${C.green} inset`}}>✓</span>
             {t}
           </div>
         ))}
       </div>
 
-      {/* HOW IT WORKS + SAMPLE TICKET */}
-      <div style={{maxWidth:1120,margin:"0 auto",padding:"100px 56px",display:"grid",gridTemplateColumns:"1fr 0.92fr",gap:80,alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:13,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",color:PH.orange,marginBottom:14}}>How it works</div>
-          <h2 style={{fontSize:33,fontWeight:800,letterSpacing:"-0.015em",marginBottom:18,lineHeight:1.18}}>From request to confirmed crew, before your coffee's cold.</h2>
-          <p style={{fontSize:15.5,color:PH.gray,lineHeight:1.65,marginBottom:30,maxWidth:440}}>Submit your job details and TEMCO's matching system contacts vetted workers near your site immediately — you watch responses come in live.</p>
-          <div style={{display:"flex",flexDirection:"column",gap:20}}>
-            {[
-              ["Submit your job","Location, date, crew size, work type"],
-              ["We dispatch instantly","Nearby workers get a text within seconds"],
-              ["Crew confirms","You get names and numbers the moment they're locked in"],
-            ].map(([t,d],i)=>(
-              <div key={t} style={{display:"flex",gap:14,alignItems:"flex-start"}}>
-                <div style={{width:26,height:26,background:PH.ink,color:PH.white,borderRadius:"50%",fontSize:12.5,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>{i+1}</div>
-                <div>
-                  <div style={{fontSize:15,color:PH.ink,fontWeight:600}}>{t}</div>
-                  <span style={{display:"block",fontSize:13.5,color:PH.gray,fontWeight:400,marginTop:3,lineHeight:1.5}}>{d}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{background:PH.white,border:`1px solid ${PH.line}`,borderRadius:16,boxShadow:"0 24px 64px rgba(20,22,26,0.10)",padding:32}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,paddingBottom:18,borderBottom:`1px solid ${PH.line}`}}>
-            <span style={{fontSize:13.5,color:PH.gray,fontWeight:600}}>Job #5830</span>
-            <span style={{background:"#E9F9EF",color:PH.green,fontSize:12,fontWeight:700,padding:"5px 12px",borderRadius:20}}>Confirmed</span>
-          </div>
-          {[["Location","Clovis, CA"],["Date","Aug 7, 2026"],["Crew size","4 workers"],["Service","Load / Unload"]].map(([k,v])=>(
-            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"13px 0",borderBottom:`1px solid ${PH.line}`,fontSize:14.5}}>
-              <span style={{color:PH.gray}}>{k}</span>
-              <span style={{fontWeight:700}}>{v}</span>
+      {/* HOW IT WORKS — clean, no demo card */}
+      <div style={{maxWidth:920,margin:"0 auto",padding:"110px 56px",textAlign:"center"}}>
+        <div style={{fontSize:13,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",color:C.amber,marginBottom:14}}>How it works</div>
+        <h2 style={{fontSize:34,fontWeight:800,letterSpacing:"-0.015em",marginBottom:16,lineHeight:1.18,color:C.chalk}}>From request to confirmed crew, in three steps.</h2>
+        <p style={{fontSize:16,color:C.muted,lineHeight:1.6,maxWidth:520,margin:"0 auto 64px"}}>Submit your job details and TEMCO's matching system contacts vetted workers near your site immediately.</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:40,textAlign:"left"}}>
+          {[
+            ["01","Submit your job","Location, date, crew size, and the type of work you need."],
+            ["02","We dispatch instantly","Nearby vetted workers are contacted within seconds."],
+            ["03","Crew confirms","You get names and numbers the moment they're locked in."],
+          ].map(([n,t,d])=>(
+            <div key={n}>
+              <div style={{fontSize:15,fontWeight:800,color:C.amber,marginBottom:14}}>{n}</div>
+              <div style={{fontSize:17,fontWeight:700,color:C.chalk,marginBottom:8}}>{t}</div>
+              <div style={{fontSize:14,color:C.muted,lineHeight:1.6}}>{d}</div>
             </div>
           ))}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",paddingTop:20}}>
-            <span style={{fontSize:12.5,color:PH.gray,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.04em"}}>Dispatch fee</span>
-            <span style={{fontSize:32,fontWeight:900,color:PH.ink}}>$400</span>
-          </div>
         </div>
       </div>
 
       {/* VALUE PROPS */}
-      <div style={{background:PH.offwhite,padding:"100px 56px"}}>
+      <div style={{background:C.navyLight,padding:"100px 56px"}}>
         <div style={{maxWidth:1120,margin:"0 auto"}}>
           <div style={{textAlign:"center",marginBottom:56}}>
-            <h2 style={{fontSize:33,fontWeight:800,letterSpacing:"-0.015em"}}>Built for the pressure you're already under</h2>
+            <h2 style={{fontSize:33,fontWeight:800,letterSpacing:"-0.015em",color:C.chalk}}>Built for the pressure you're already under</h2>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:24}}>
             {[
@@ -246,31 +218,31 @@ function PublicHome({ onNav, workerCount, stateCount }) {
               ["1","Flat dispatch fee","One transparent fee per job — no surprise charges, no long-term contracts."],
               [`${stateCount}`,"States, one platform","Stop rebuilding your labor network every time a job takes you somewhere new."],
             ].map(([num,title,desc])=>(
-              <div key={title} style={{background:PH.white,borderRadius:14,padding:32,border:`1px solid ${PH.line}`}}>
-                <div style={{fontSize:36,fontWeight:900,color:PH.orange,marginBottom:10,lineHeight:1}}>{num}</div>
-                <div style={{fontSize:16,fontWeight:700,marginBottom:10}}>{title}</div>
-                <div style={{fontSize:13.5,color:PH.gray,lineHeight:1.6}}>{desc}</div>
+              <div key={title} style={{background:C.navyMid,borderRadius:14,padding:32,border:`1px solid ${C.border}`}}>
+                <div style={{fontSize:36,fontWeight:900,color:C.amber,marginBottom:10,lineHeight:1}}>{num}</div>
+                <div style={{fontSize:16,fontWeight:700,marginBottom:10,color:C.chalk}}>{title}</div>
+                <div style={{fontSize:13.5,color:C.muted,lineHeight:1.6}}>{desc}</div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* FINAL CTA */}
-      <div style={{background:PH.ink,padding:"100px 56px",textAlign:"center"}}>
+      {/* FINAL CTA — light, not dark */}
+      <div style={{background:C.navyMid,padding:"110px 56px",textAlign:"center",borderTop:`1px solid ${C.border}`}}>
         <div style={{maxWidth:560,margin:"0 auto"}}>
-          <h2 style={{color:PH.white,fontSize:36,fontWeight:800,letterSpacing:"-0.015em",marginBottom:16,lineHeight:1.2}}>Your next job doesn't wait. Neither should your crew.</h2>
-          <p style={{color:"#9BA1AC",fontSize:16,marginBottom:36,lineHeight:1.5}}>Submit a request now and get matched with vetted labor near your job site.</p>
-          <button onClick={()=>onNav("request")} style={{background:PH.orange,color:PH.white,fontSize:17,fontWeight:800,padding:"18px 44px",border:"none",borderRadius:10,cursor:"pointer",boxShadow:"0 8px 24px rgba(255,90,31,0.32)"}}>Request Your Crew Now →</button>
+          <h2 style={{color:C.chalk,fontSize:36,fontWeight:800,letterSpacing:"-0.015em",marginBottom:16,lineHeight:1.2}}>Your next job doesn't wait. Neither should your crew.</h2>
+          <p style={{color:C.muted,fontSize:16,marginBottom:36,lineHeight:1.5}}>Submit a request now and get matched with vetted labor near your job site.</p>
+          <button onClick={()=>onNav("request")} style={{background:C.amber,color:C.chalk,fontSize:17,fontWeight:800,padding:"18px 44px",border:"none",borderRadius:10,cursor:"pointer",boxShadow:"0 8px 24px rgba(255,90,31,0.28)"}}>Request Your Crew Now →</button>
         </div>
       </div>
 
       {/* Footer legal links, preserved from original */}
-      <div style={{padding:"36px 56px",textAlign:"center",color:"#9BA1AC",fontSize:12.5,background:PH.inkSoft}}>
+      <div style={{padding:"36px 56px",textAlign:"center",color:C.grayLight,fontSize:12.5,background:C.navy,borderTop:`1px solid ${C.border}`}}>
         <div style={{display:"flex",gap:20,justifyContent:"center",flexWrap:"wrap",marginBottom:12}}>
-          <span style={{cursor:"pointer",color:"#9BA1AC"}} onClick={()=>onNav("terms")}>Terms of Service</span>
-          <span style={{cursor:"pointer",color:"#9BA1AC"}} onClick={()=>onNav("privacy")}>Privacy Policy</span>
-          <span style={{cursor:"pointer",color:"#9BA1AC"}} onClick={()=>onNav("worker-agreement")}>Worker Agreement</span>
+          <span style={{cursor:"pointer",color:C.muted}} onClick={()=>onNav("terms")}>Terms of Service</span>
+          <span style={{cursor:"pointer",color:C.muted}} onClick={()=>onNav("privacy")}>Privacy Policy</span>
+          <span style={{cursor:"pointer",color:C.muted}} onClick={()=>onNav("worker-agreement")}>Worker Agreement</span>
         </div>
         The Empire Moving Co., LLC d/b/a TEMCO National Labor Dispatch Network. All rights reserved.
       </div>
@@ -604,7 +576,7 @@ function WorkerSignup({ states }) {
               <button key={s} onClick={()=>toggleSkill(s)} style={{
                 padding:"6px 13px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",
                 background:form.skills.includes(s)?C.amber:C.navyMid,
-                color:form.skills.includes(s)?C.navy:C.muted,
+                color:form.skills.includes(s)?C.chalk:C.muted,
                 border:`1px solid ${form.skills.includes(s)?C.amber:C.border}`
               }}>{s}</button>
             ))}
@@ -755,7 +727,7 @@ function CustomerPortal({ token, onLogout }) {
       <Tabs tabs={[["jobs","My Jobs"],["billing","Invoices"],["request","New Request"]]} active={tab} onChange={setTab}/>
 
       {loadError && (
-        <div style={{background:"#2A1A1A",border:`1px solid ${C.red}55`,borderRadius:10,padding:"12px 16px",marginBottom:20,color:C.red,fontSize:13}}>
+        <div style={{background:"#FDECEA",border:`1px solid ${C.red}55`,borderRadius:10,padding:"12px 16px",marginBottom:20,color:C.red,fontSize:13}}>
           {loadError}
         </div>
       )}
@@ -1035,7 +1007,7 @@ function WorkerPortal({ token, onLogout }) {
       </div>
 
       {loadError && (
-        <div style={{background:"#2A1A1A",border:`1px solid ${C.red}55`,borderRadius:10,padding:"12px 16px",marginBottom:20,color:C.red,fontSize:13}}>
+        <div style={{background:"#FDECEA",border:`1px solid ${C.red}55`,borderRadius:10,padding:"12px 16px",marginBottom:20,color:C.red,fontSize:13}}>
           {loadError}
         </div>
       )}
@@ -1077,7 +1049,7 @@ function WorkerPortal({ token, onLogout }) {
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:22,flexWrap:"wrap"}}>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22}}>
-            <div style={{width:54,height:54,borderRadius:"50%",background:C.amber,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:900,color:C.navy,marginBottom:14}}>
+            <div style={{width:54,height:54,borderRadius:"50%",background:C.amber,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:900,color:C.chalk,marginBottom:14}}>
               {worker.name ? worker.name.split(" ").map(n=>n[0]).slice(0,2).join("").toUpperCase() : "?"}
             </div>
             <div style={{fontWeight:800,fontSize:17,color:C.chalk}}>{worker.name}</div>
@@ -1116,7 +1088,7 @@ function WorkerPortal({ token, onLogout }) {
                 </div>
                 <div style={{
                   fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:20,
-                  background:j.noShow?"#2A1A1A":j.response==='YES'?"#163B2A":j.response==='NO'?"#2A1A1A":"#1A1A2E",
+                  background:j.noShow?"#FDECEA":j.response==='YES'?"#E9F9EF":j.response==='NO'?"#FDECEA":"#F3F4F6",
                   color:j.noShow?C.red:j.response==='YES'?C.green:j.response==='NO'?C.red:C.muted
                 }}>
                   {j.noShow?"NO-SHOW":j.response||"Pending"}
@@ -1133,7 +1105,7 @@ function WorkerPortal({ token, onLogout }) {
               ["3","Show up and get paid","Customer pays you directly on-site at the agreed rate."],
             ].map(([n,t,d])=>(
               <div key={n} style={{display:"flex",gap:12,marginBottom:14}}>
-                <div style={{width:24,height:24,borderRadius:"50%",background:C.amber,color:C.navy,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,flexShrink:0}}>{n}</div>
+                <div style={{width:24,height:24,borderRadius:"50%",background:C.amber,color:C.chalk,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,flexShrink:0}}>{n}</div>
                 <div>
                   <div style={{color:C.chalk,fontWeight:600,fontSize:13}}>{t}</div>
                   <div style={{color:C.muted,fontSize:12,marginTop:2}}>{d}</div>
@@ -1676,7 +1648,7 @@ function AdminPortal({ token, onLogout }) {
       </div>
 
       {(loadError || jobsLoadError) && (
-        <div style={{background:"#2A1A1A",border:`1px solid ${C.red}55`,borderRadius:10,padding:"12px 16px",marginBottom:20,color:C.red,fontSize:13}}>
+        <div style={{background:"#FDECEA",border:`1px solid ${C.red}55`,borderRadius:10,padding:"12px 16px",marginBottom:20,color:C.red,fontSize:13}}>
           {[loadError, jobsLoadError].filter(Boolean).join(" ")} — showing what data is available below.
         </div>
       )}
@@ -2004,7 +1976,7 @@ function AdminPortal({ token, onLogout }) {
                       🔄 Re-Dispatch More Workers
                     </button>
                     {j.status!=="Cancelled" && j.status!=="Completed" && (
-                      <button onClick={()=>handleMarkCompleted(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.amber,color:C.navy,border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
+                      <button onClick={()=>handleMarkCompleted(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.amber,color:C.chalk,border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
                         ✓ Mark Completed
                       </button>
                     )}
@@ -2038,7 +2010,7 @@ function AdminPortal({ token, onLogout }) {
                         <div style={{display:"flex",gap:8,alignItems:"center"}}>
                           <span style={{
                             fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:20,
-                            background:w.response==='YES'?"#163B2A":w.response==='NO'?"#2A1A1A":w.no_show?"#2A1A1A":"#1A1A2E",
+                            background:w.response==='YES'?"#E9F9EF":w.response==='NO'?"#FDECEA":w.no_show?"#FDECEA":"#F3F4F6",
                             color:w.response==='YES'?C.green:w.response==='NO'?C.red:w.no_show?C.red:C.muted
                           }}>
                             {w.no_show?"NO-SHOW":w.response||"Pending"}
@@ -2289,7 +2261,7 @@ function DispatchSim({ workers, states }) {
                 {dispatched && (
                   <div style={{
                     padding:"3px 12px",borderRadius:20,fontSize:11,fontWeight:800,
-                    background:responses[w.id]==="YES"?"#163B2A":responses[w.id]==="BACKUP"?"#1A2030":"#2A1A1A",
+                    background:responses[w.id]==="YES"?"#E9F9EF":responses[w.id]==="BACKUP"?"#EFF6FF":"#FDECEA",
                     color:responses[w.id]==="YES"?C.green:responses[w.id]==="BACKUP"?C.blue:C.red
                   }}>
                     {responses[w.id]==="YES"?"✓ CONFIRMED":responses[w.id]==="BACKUP"?"⏳ BACKUP":"📱 SENT"}
@@ -2302,7 +2274,7 @@ function DispatchSim({ workers, states }) {
             </div>
           ))}
           {dispatched && (
-            <div style={{marginTop:16,padding:14,background:"#163B2A",borderRadius:8,color:C.green,fontWeight:700,fontSize:13}}>
+            <div style={{marginTop:16,padding:14,background:"#E9F9EF",borderRadius:8,color:C.green,fontWeight:700,fontSize:13}}>
               ✓ {Math.min(crew,candidates.length)} workers confirmed for dispatch · Dispatch fee: ${crew*100} · Worker info will release upon payment
             </div>
           )}
@@ -2550,7 +2522,7 @@ export default function App() {
       <nav style={{background:C.navy,borderBottom:`1px solid ${C.border}`,padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,position:"sticky",top:0,zIndex:100,flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:16}}>
           <div onClick={()=>navigate("home")} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
-            <div style={{background:C.amber,width:30,height:30,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:C.navy}}>T</div>
+            <div style={{background:C.amber,width:30,height:30,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:C.chalk}}>T</div>
             <div>
               <div style={{fontWeight:900,fontSize:14,letterSpacing:"0.08em",color:C.chalk,lineHeight:1}}>TEMCO</div>
               <div style={{fontSize:9,color:C.muted,letterSpacing:"0.05em",textTransform:"uppercase"}}>Labor Dispatch</div>
