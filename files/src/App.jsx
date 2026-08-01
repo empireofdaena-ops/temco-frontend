@@ -149,7 +149,7 @@ function PublicHome({ onNav, workerCount, stateCount }) {
       <div style={{background:C.navy,padding:"96px 56px 0"}}>
         <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
           <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"#FFF0E9",color:C.amberDim,fontSize:13.5,fontWeight:700,padding:"8px 18px",borderRadius:20,marginBottom:32}}>
-            Last-minute labor gaps cost you the job — not with TEMCO
+            Built for moving companies, brokers, and carriers nationwide
           </div>
           <h1 style={{fontFamily:"'Inter',sans-serif",fontSize:"clamp(40px,5vw,58px)",fontWeight:900,lineHeight:1.08,letterSpacing:"-0.02em",color:C.chalk,margin:"0 0 24px"}}>
             A confirmed moving crew,<br/><span style={{color:C.amber}}>in minutes — not days.</span>
@@ -220,6 +220,32 @@ function PublicHome({ onNav, workerCount, stateCount }) {
                 <div style={{fontSize:36,fontWeight:900,color:C.amber,marginBottom:10,lineHeight:1}}>{num}</div>
                 <div style={{fontSize:16,fontWeight:700,marginBottom:10,color:C.chalk}}>{title}</div>
                 <div style={{fontSize:13.5,color:C.muted,lineHeight:1.6}}>{desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* FOR WORKERS */}
+      <div style={{padding:"100px 56px",background:C.navy}}>
+        <div style={{maxWidth:1120,margin:"0 auto",display:"grid",gridTemplateColumns:"1fr 1fr",gap:64,alignItems:"center"}} className="temco-grid-2">
+          <div>
+            <div style={{fontSize:13,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",color:C.amber,marginBottom:14}}>For workers</div>
+            <h2 style={{fontSize:33,fontWeight:800,letterSpacing:"-0.015em",color:C.chalk,marginBottom:18,lineHeight:1.2}}>Get paid moving jobs texted straight to your phone.</h2>
+            <p style={{fontSize:15.5,color:C.muted,lineHeight:1.65,marginBottom:28,maxWidth:440}}>
+              No app to download, no membership fees. Join the TEMCO network, get matched with jobs near you, and get paid directly on-site — every time.
+            </p>
+            <button onClick={()=>onNav("worker-signup")} style={{background:C.chalk,color:C.navyMid,fontSize:16,fontWeight:800,padding:"16px 32px",border:"none",borderRadius:10,cursor:"pointer"}}>Become a Helper →</button>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            {[
+              ["Get offers by text","No app needed — job offers come straight to your phone."],
+              ["Reply YES or NO","Accept or decline with a single word. You're always in control."],
+              ["Get paid on-site","The customer pays you directly — TEMCO never touches your pay."],
+            ].map(([t,d])=>(
+              <div key={t} style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:"18px 22px"}}>
+                <div style={{fontSize:15,fontWeight:700,color:C.chalk,marginBottom:4}}>{t}</div>
+                <div style={{fontSize:13.5,color:C.muted,lineHeight:1.5}}>{d}</div>
               </div>
             ))}
           </div>
@@ -2549,7 +2575,7 @@ export default function App() {
           box-shadow: 0 0 0 3px rgba(255,90,31,0.15);
         }
         @media (max-width: 860px) {
-          .temco-grid-3, .temco-grid-4 { grid-template-columns: 1fr !important; }
+          .temco-grid-3, .temco-grid-4, .temco-grid-2 { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
