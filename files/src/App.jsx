@@ -145,8 +145,6 @@ function exportToCSV(filename, rows, columns) {
 function PublicHome({ onNav, workerCount, stateCount }) {
   return (
     <div>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
-
       {/* HERO */}
       <div style={{background:C.navy,padding:"96px 56px 0"}}>
         <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
@@ -191,7 +189,7 @@ function PublicHome({ onNav, workerCount, stateCount }) {
         <div style={{fontSize:13,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",color:C.amber,marginBottom:14}}>How it works</div>
         <h2 style={{fontSize:34,fontWeight:800,letterSpacing:"-0.015em",marginBottom:16,lineHeight:1.18,color:C.chalk}}>From request to confirmed crew, in three steps.</h2>
         <p style={{fontSize:16,color:C.muted,lineHeight:1.6,maxWidth:520,margin:"0 auto 64px"}}>Submit your job details and TEMCO's matching system contacts vetted workers near your site immediately.</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:40,textAlign:"left"}}>
+        <div className="temco-grid-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:40,textAlign:"left"}}>
           {[
             ["01","Submit your job","Location, date, crew size, and the type of work you need."],
             ["02","We dispatch instantly","Nearby vetted workers are contacted within seconds."],
@@ -212,7 +210,7 @@ function PublicHome({ onNav, workerCount, stateCount }) {
           <div style={{textAlign:"center",marginBottom:56}}>
             <h2 style={{fontSize:33,fontWeight:800,letterSpacing:"-0.015em",color:C.chalk}}>Built for the pressure you're already under</h2>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:24}}>
+          <div className="temco-grid-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:24}}>
             {[
               ["0","Payroll headaches","Workers are paid directly on-site. You never touch payroll, tax forms, or worker comp."],
               ["1","Flat dispatch fee","One transparent fee per job — no surprise charges, no long-term contracts."],
@@ -2484,6 +2482,29 @@ export default function App() {
     setWorkerToken(t);
   };
 
+  useEffect(() => {
+    const titles = {
+      home: "TEMCO — Nationwide Moving Labor Dispatch",
+      request: "Request Labor — TEMCO",
+      "worker-signup": "Become a Helper — TEMCO",
+      "customer-portal": "Customer Portal — TEMCO",
+      "worker-portal": "Worker Portal — TEMCO",
+      admin: "Admin — TEMCO",
+      terms: "Terms of Service — TEMCO",
+      privacy: "Privacy Policy — TEMCO",
+      "worker-agreement": "Worker Agreement — TEMCO",
+    };
+    document.title = titles[page] || "TEMCO — Nationwide Moving Labor Dispatch";
+
+    let favicon = document.querySelector("link[rel='icon']");
+    if (!favicon) {
+      favicon = document.createElement("link");
+      favicon.rel = "icon";
+      document.head.appendChild(favicon);
+    }
+    favicon.href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23FF5A1F'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-weight='900' font-size='18' fill='%231A1D23' text-anchor='middle'%3ET%3C/text%3E%3C/svg%3E";
+  }, [page]);
+
   const NAV_LEFT = [
     {id:"home",label:"Home"},
     {id:"request",label:"Request Labor"},
@@ -2516,8 +2537,21 @@ export default function App() {
   };
 
   return (
-    <div style={{minHeight:"100vh",background:C.navy,color:C.chalk,fontFamily:"'Space Grotesk','Inter',sans-serif"}}>
-      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <div style={{minHeight:"100vh",background:C.navy,color:C.chalk,fontFamily:"'Inter',sans-serif"}}>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+      <style>{`
+        button { transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
+        button:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
+        button:active:not(:disabled) { transform: translateY(0); }
+        input:focus, select:focus, textarea:focus {
+          outline: none;
+          border-color: ${C.amber} !important;
+          box-shadow: 0 0 0 3px rgba(255,90,31,0.15);
+        }
+        @media (max-width: 860px) {
+          .temco-grid-3, .temco-grid-4 { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
 
       <nav style={{background:C.navy,borderBottom:`1px solid ${C.border}`,padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56,position:"sticky",top:0,zIndex:100,flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:16}}>
