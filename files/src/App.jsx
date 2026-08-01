@@ -140,82 +140,139 @@ function exportToCSV(filename, rows, columns) {
 }
 
 // ─── PUBLIC HOME ──────────────────────────────────────────────────────────────
+// Design tokens scoped to the marketing pages only (premium, conversion-focused —
+// near-black + orange accent) — separate from the C tokens used by the operational
+// dashboards below, so this redesign doesn't affect Admin/Worker/Customer portal styling.
+const PH = {
+  ink: "#14161A", inkSoft: "#1D2026", white: "#FFFFFF", offwhite: "#FAFAF9",
+  orange: "#FF5A1F", orangeDeep: "#E0450F", green: "#16A34A",
+  gray: "#6B7280", grayLight: "#9CA3AF", line: "#E7E7E5",
+};
+
 function PublicHome({ onNav, workerCount, stateCount }) {
   return (
     <div>
-      <div style={{background:`linear-gradient(150deg,${C.navy} 0%,${C.navyMid} 100%)`,padding:"72px 40px 56px",textAlign:"center",borderBottom:`1px solid ${C.border}`}}>
-        <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(245,166,35,0.12)",border:`1px solid ${C.amber}33`,padding:"4px 14px",borderRadius:20,marginBottom:20}}>
-          <span style={{width:6,height:6,borderRadius:"50%",background:C.green,display:"inline-block"}}/>
-          <span style={{fontSize:11,fontWeight:700,color:C.amber,letterSpacing:"0.1em",textTransform:"uppercase"}}>Now Dispatching Nationwide</span>
-        </div>
-        <h1 style={{fontSize:"clamp(34px,5.5vw,60px)",fontWeight:900,color:C.chalk,lineHeight:1.05,margin:"0 0 18px",maxWidth:680,marginLeft:"auto",marginRight:"auto"}}>
-          Moving Labor.<br/><span style={{color:C.amber}}>Any City.</span> Within Minutes.
-        </h1>
-        <p style={{fontSize:17,color:C.muted,maxWidth:500,margin:"0 auto 36px",lineHeight:1.6}}>
-          TEMCO connects moving companies, carriers, and brokers with vetted crews anywhere in the US — automated, dispatched, confirmed.
-        </p>
-        <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-          <button onClick={()=>onNav("request")} style={{background:C.amber,color:C.navy,border:"none",padding:"14px 32px",borderRadius:8,fontSize:15,fontWeight:800,cursor:"pointer"}}>Request Labor Now →</button>
-          <button onClick={()=>onNav("worker-signup")} style={{background:"transparent",color:C.chalk,border:`1px solid ${C.border}`,padding:"14px 28px",borderRadius:8,fontSize:15,fontWeight:600,cursor:"pointer"}}>Become a Helper</button>
-        </div>
-        <div style={{display:"flex",gap:32,justifyContent:"center",marginTop:48,flexWrap:"wrap"}}>
-          {[
-            {val:`${workerCount}+`, lbl:"Vetted Workers"},
-            {val:`${stateCount}`, lbl:"States Covered"},
-            {val:"< 10 min", lbl:"Avg. Dispatch Time"},
-            {val:"97%", lbl:"Fill Rate"},
-          ].map(s=>(
-            <div key={s.lbl} style={{textAlign:"center"}}>
-              <div style={{fontSize:26,fontWeight:900,color:C.amber}}>{s.val}</div>
-              <div style={{fontSize:12,color:C.muted,marginTop:2}}>{s.lbl}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 
-      <div style={{padding:"56px 40px",maxWidth:900,margin:"0 auto"}}>
-        <div style={{textAlign:"center",marginBottom:44}}>
-          <div style={{fontSize:11,color:C.amber,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>The Process</div>
-          <h2 style={{fontSize:28,fontWeight:800,color:C.chalk,margin:0}}>From Request to Confirmed Crew in Minutes</h2>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:16}}>
-          {[
-            {step:"01",title:"Submit Request",desc:"Enter job location, date, crew size, and type of work needed."},
-            {step:"02",title:"AI Matches Crew",desc:"System ranks nearby workers by distance, skill, certifications, and reliability."},
-            {step:"03",title:"SMS Dispatch",desc:"Workers get a text instantly. YES/NO replies are tracked in real time."},
-            {step:"04",title:"Crew Confirmed",desc:"You receive worker names, phones, crew lead — ready to roll."},
-          ].map(s=>(
-            <div key={s.step} style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22}}>
-              <div style={{fontSize:28,fontWeight:900,color:C.amber,opacity:0.35,fontFamily:"monospace"}}>{s.step}</div>
-              <div style={{fontSize:15,fontWeight:700,color:C.chalk,margin:"8px 0 6px"}}>{s.title}</div>
-              <div style={{fontSize:13,color:C.muted,lineHeight:1.6}}>{s.desc}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{background:C.navyMid,padding:"56px 40px",borderTop:`1px solid ${C.border}`,borderBottom:`1px solid ${C.border}`}}>
-        <div style={{maxWidth:560,margin:"0 auto",textAlign:"center"}}>
-          <h2 style={{fontSize:26,fontWeight:800,color:C.chalk,margin:"0 0 8px"}}>Simple, Transparent Pricing</h2>
-          <p style={{color:C.muted,marginBottom:32}}>Dispatch fee scales with job type, crew size, and timing. You pay workers directly on-site.</p>
-          <div style={{background:C.navy,border:`1px solid ${C.border}`,borderRadius:14,padding:"32px 40px",display:"inline-block"}}>
-            <div style={{fontSize:48,fontWeight:900,color:C.amber}}>$75–$125</div>
-            <div style={{color:C.muted,fontSize:14,marginTop:4}}>per worker dispatched</div>
-            <div style={{marginTop:20,color:C.chalk,opacity:0.7,fontSize:13,lineHeight:1.8}}>
-              TEMCO never processes worker payroll.<br/>You pay workers directly on-site at your rate.
-            </div>
+      {/* HERO */}
+      <div style={{background:PH.offwhite,padding:"100px 56px 0"}}>
+        <div style={{maxWidth:820,margin:"0 auto",textAlign:"center"}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"#FFF0E9",color:PH.orangeDeep,fontSize:13.5,fontWeight:700,padding:"8px 18px",borderRadius:20,marginBottom:32}}>
+            Last-minute labor gaps cost you the job — not with TEMCO
+          </div>
+          <h1 style={{fontFamily:"'Inter',sans-serif",fontSize:"clamp(40px,5vw,60px)",fontWeight:900,lineHeight:1.08,letterSpacing:"-0.02em",color:PH.ink,margin:"0 0 24px"}}>
+            A confirmed moving crew,<br/><span style={{color:PH.orange}}>in minutes — not days.</span>
+          </h1>
+          <p style={{fontSize:18,color:PH.gray,lineHeight:1.6,maxWidth:580,margin:"0 auto 40px"}}>
+            TEMCO matches your job with vetted, local moving labor across all {stateCount} states — no cold calls, no group chats, no guesswork. Just a confirmed crew, fast.
+          </p>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,marginBottom:64}}>
+            <button onClick={()=>onNav("request")} style={{background:PH.orange,color:PH.white,fontSize:17,fontWeight:800,padding:"18px 44px",border:"none",borderRadius:10,cursor:"pointer",boxShadow:"0 8px 24px rgba(255,90,31,0.32)"}}>Request Your Crew Now →</button>
+            <div style={{fontSize:13.5,color:PH.gray,fontWeight:500}}>No crew confirmed, <strong style={{color:PH.ink}}>no charge</strong> — average match time under 10 minutes.</div>
           </div>
         </div>
       </div>
 
-      <div style={{padding:"32px 40px",textAlign:"center",color:C.muted,fontSize:12}}>
-        <div style={{display:"flex",gap:20,justifyContent:"center",flexWrap:"wrap",marginBottom:12}}>
-          <span style={{cursor:"pointer"}} onClick={()=>onNav("terms")}>Terms of Service</span>
-          <span style={{cursor:"pointer"}} onClick={()=>onNav("privacy")}>Privacy Policy</span>
-          <span style={{cursor:"pointer"}} onClick={()=>onNav("worker-agreement")}>Worker Agreement</span>
-          <span style={{cursor:"pointer"}}>Contact: (347) 835-4479</span>
+      {/* SOCIAL PROOF STRIP */}
+      <div style={{background:PH.ink,padding:"30px 56px",display:"flex",justifyContent:"center",gap:80,flexWrap:"wrap"}}>
+        {[[`${workerCount}+`,"Active workers"],[`${stateCount}`,"States covered"],["97%","Fill rate"],["<10 min","Avg. match time"]].map(([num,label])=>(
+          <div key={label} style={{textAlign:"center",minWidth:90}}>
+            <div style={{fontSize:27,fontWeight:800,color:PH.white}}>{num}</div>
+            <div style={{fontSize:12,color:"#9BA1AC",marginTop:4,letterSpacing:"0.02em"}}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* GUARANTEE STRIP */}
+      <div style={{background:PH.white,borderBottom:`1px solid ${PH.line}`,padding:"22px 56px",display:"flex",justifyContent:"center",gap:48,flexWrap:"wrap"}}>
+        {["No membership or setup fee","Pay only when your crew is confirmed","Workers paid on-site — no payroll to manage"].map(t=>(
+          <div key={t} style={{display:"flex",alignItems:"center",gap:10,fontSize:14,fontWeight:600,color:PH.ink}}>
+            <span style={{width:20,height:20,background:"#E9F9EF",color:PH.green,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,flexShrink:0}}>✓</span>
+            {t}
+          </div>
+        ))}
+      </div>
+
+      {/* HOW IT WORKS + SAMPLE TICKET */}
+      <div style={{maxWidth:1120,margin:"0 auto",padding:"100px 56px",display:"grid",gridTemplateColumns:"1fr 0.92fr",gap:80,alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",color:PH.orange,marginBottom:14}}>How it works</div>
+          <h2 style={{fontSize:33,fontWeight:800,letterSpacing:"-0.015em",marginBottom:18,lineHeight:1.18}}>From request to confirmed crew, before your coffee's cold.</h2>
+          <p style={{fontSize:15.5,color:PH.gray,lineHeight:1.65,marginBottom:30,maxWidth:440}}>Submit your job details and TEMCO's matching system contacts vetted workers near your site immediately — you watch responses come in live.</p>
+          <div style={{display:"flex",flexDirection:"column",gap:20}}>
+            {[
+              ["Submit your job","Location, date, crew size, work type"],
+              ["We dispatch instantly","Nearby workers get a text within seconds"],
+              ["Crew confirms","You get names and numbers the moment they're locked in"],
+            ].map(([t,d],i)=>(
+              <div key={t} style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+                <div style={{width:26,height:26,background:PH.ink,color:PH.white,borderRadius:"50%",fontSize:12.5,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>{i+1}</div>
+                <div>
+                  <div style={{fontSize:15,color:PH.ink,fontWeight:600}}>{t}</div>
+                  <span style={{display:"block",fontSize:13.5,color:PH.gray,fontWeight:400,marginTop:3,lineHeight:1.5}}>{d}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        © 2026 The Empire Moving Co., LLC d/b/a TEMCO National Labor Dispatch Network. All rights reserved.
+
+        <div style={{background:PH.white,border:`1px solid ${PH.line}`,borderRadius:16,boxShadow:"0 24px 64px rgba(20,22,26,0.10)",padding:32}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,paddingBottom:18,borderBottom:`1px solid ${PH.line}`}}>
+            <span style={{fontSize:13.5,color:PH.gray,fontWeight:600}}>Job #5830</span>
+            <span style={{background:"#E9F9EF",color:PH.green,fontSize:12,fontWeight:700,padding:"5px 12px",borderRadius:20}}>Confirmed</span>
+          </div>
+          {[["Location","Clovis, CA"],["Date","Aug 7, 2026"],["Crew size","4 workers"],["Service","Load / Unload"]].map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"13px 0",borderBottom:`1px solid ${PH.line}`,fontSize:14.5}}>
+              <span style={{color:PH.gray}}>{k}</span>
+              <span style={{fontWeight:700}}>{v}</span>
+            </div>
+          ))}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",paddingTop:20}}>
+            <span style={{fontSize:12.5,color:PH.gray,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.04em"}}>Dispatch fee</span>
+            <span style={{fontSize:32,fontWeight:900,color:PH.ink}}>$400</span>
+          </div>
+        </div>
+      </div>
+
+      {/* VALUE PROPS */}
+      <div style={{background:PH.offwhite,padding:"100px 56px"}}>
+        <div style={{maxWidth:1120,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:56}}>
+            <h2 style={{fontSize:33,fontWeight:800,letterSpacing:"-0.015em"}}>Built for the pressure you're already under</h2>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:24}}>
+            {[
+              ["0","Payroll headaches","Workers are paid directly on-site. You never touch payroll, tax forms, or worker comp."],
+              ["1","Flat dispatch fee","One transparent fee per job — no surprise charges, no long-term contracts."],
+              [`${stateCount}`,"States, one platform","Stop rebuilding your labor network every time a job takes you somewhere new."],
+            ].map(([num,title,desc])=>(
+              <div key={title} style={{background:PH.white,borderRadius:14,padding:32,border:`1px solid ${PH.line}`}}>
+                <div style={{fontSize:36,fontWeight:900,color:PH.orange,marginBottom:10,lineHeight:1}}>{num}</div>
+                <div style={{fontSize:16,fontWeight:700,marginBottom:10}}>{title}</div>
+                <div style={{fontSize:13.5,color:PH.gray,lineHeight:1.6}}>{desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* FINAL CTA */}
+      <div style={{background:PH.ink,padding:"100px 56px",textAlign:"center"}}>
+        <div style={{maxWidth:560,margin:"0 auto"}}>
+          <h2 style={{color:PH.white,fontSize:36,fontWeight:800,letterSpacing:"-0.015em",marginBottom:16,lineHeight:1.2}}>Your next job doesn't wait. Neither should your crew.</h2>
+          <p style={{color:"#9BA1AC",fontSize:16,marginBottom:36,lineHeight:1.5}}>Submit a request now and get matched with vetted labor near your job site.</p>
+          <button onClick={()=>onNav("request")} style={{background:PH.orange,color:PH.white,fontSize:17,fontWeight:800,padding:"18px 44px",border:"none",borderRadius:10,cursor:"pointer",boxShadow:"0 8px 24px rgba(255,90,31,0.32)"}}>Request Your Crew Now →</button>
+        </div>
+      </div>
+
+      {/* Footer legal links, preserved from original */}
+      <div style={{padding:"36px 56px",textAlign:"center",color:"#9BA1AC",fontSize:12.5,background:PH.inkSoft}}>
+        <div style={{display:"flex",gap:20,justifyContent:"center",flexWrap:"wrap",marginBottom:12}}>
+          <span style={{cursor:"pointer",color:"#9BA1AC"}} onClick={()=>onNav("terms")}>Terms of Service</span>
+          <span style={{cursor:"pointer",color:"#9BA1AC"}} onClick={()=>onNav("privacy")}>Privacy Policy</span>
+          <span style={{cursor:"pointer",color:"#9BA1AC"}} onClick={()=>onNav("worker-agreement")}>Worker Agreement</span>
+        </div>
+        The Empire Moving Co., LLC d/b/a TEMCO National Labor Dispatch Network. All rights reserved.
       </div>
     </div>
   );
