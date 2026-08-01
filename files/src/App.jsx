@@ -1275,6 +1275,50 @@ function AdminPortal({ token, onLogout }) {
     }
   };
 
+  const handleFinalizePayment = async (jobId) => {
+    if (!window.confirm("Capture payment for confirmed workers and release the crew to the customer? This charges the customer's held card for however many workers are currently confirmed.")) return;
+    setActionLoading(prev => ({...prev, [jobId]: true}));
+    try {
+      const res = await fetch(`${API_BASE}/api/payments/${jobId}/finalize`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLiveJobs(prev => prev.map(j => j.id === jobId ? {...j, payment_status: "Paid"} : j));
+        setActionResults(prev => ({...prev, [jobId]: `✓ Captured $${data.capturedAmount} for ${data.confirmedCount} of ${data.requestedCrew} requested workers — crew released to customer`}));
+      } else {
+        setActionResults(prev => ({...prev, [jobId]: `Error: ${data.error}`}));
+      }
+    } catch(e) {
+      setActionResults(prev => ({...prev, [jobId]: "Could not reach server"}));
+    } finally {
+      setActionLoading(prev => ({...prev, [jobId]: false}));
+    }
+  };
+
+  const handleCancelHold = async (jobId) => {
+    if (!window.confirm("Release the payment hold with no charge? Use this if a crew genuinely couldn't be filled — the customer will not be charged.")) return;
+    setActionLoading(prev => ({...prev, [jobId]: true}));
+    try {
+      const res = await fetch(`${API_BASE}/api/payments/${jobId}/cancel-hold`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLiveJobs(prev => prev.map(j => j.id === jobId ? {...j, payment_status: "Hold Released"} : j));
+        setActionResults(prev => ({...prev, [jobId]: "✓ Payment hold released — customer was not charged"}));
+      } else {
+        setActionResults(prev => ({...prev, [jobId]: `Error: ${data.error}`}));
+      }
+    } catch(e) {
+      setActionResults(prev => ({...prev, [jobId]: "Could not reach server"}));
+    } finally {
+      setActionLoading(prev => ({...prev, [jobId]: false}));
+    }
+  };
+
   const handleRedispatch = async (jobId) => {
     setActionLoading(prev => ({...prev, [jobId]: true}));
     try {
@@ -1583,6 +1627,7 @@ function AdminPortal({ token, onLogout }) {
     crew: j.crew_size,
     type: j.work_type,
     status: j.status,
+    payment_status: j.payment_status,
     fee: parseFloat(j.dispatch_fee) || 0,
   })), [liveJobs]);
 
@@ -1996,6 +2041,16 @@ function AdminPortal({ token, onLogout }) {
                     <button onClick={()=>handleReleaseCrewManually(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.green,color:"white",border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
                       📤 Release Crew to Customer
                     </button>
+                    {j.payment_status==="Authorized" && (
+                      <button onClick={()=>handleFinalizePayment(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.amber,color:C.chalk,border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
+                        💳 Finalize & Capture Payment
+                      </button>
+                    )}
+                    {j.payment_status==="Authorized" && (
+                      <button onClick={()=>handleCancelHold(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:"transparent",color:C.muted,border:`1px solid ${C.border}`,padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
+                        🔓 Release Hold (No Charge)
+                      </button>
+                    )}
                     <button onClick={()=>handleRedispatch(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.blue,color:"white",border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
                       🔄 Re-Dispatch More Workers
                     </button>
@@ -2419,15 +2474,15 @@ function PaymentSuccess({ onNav }) {
   return (
     <div style={{padding:"64px 40px",maxWidth:500,margin:"0 auto",textAlign:"center"}}>
       <div style={{fontSize:52,marginBottom:14}}>✅</div>
-      <h2 style={{fontSize:24,fontWeight:800,color:C.chalk,marginBottom:8}}>Payment Confirmed!</h2>
+      <h2 style={{fontSize:24,fontWeight:800,color:C.chalk,marginBottom:8}}>Payment Method Confirmed</h2>
       <p style={{color:C.muted,lineHeight:1.7,marginBottom:28}}>
-        Your dispatch fee has been received. You'll receive a text shortly with your crew details — names, phone numbers, and your crew lead. They're on their way.
+        Your card is authorized and held — you won't be charged until your crew is confirmed. We're matching your job with available workers now, and you'll get a text the moment your crew is locked in.
       </p>
       <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:20,marginBottom:24}}>
         <div style={{fontSize:13,color:C.muted,lineHeight:1.8}}>
-          <div>✓ Payment processed</div>
-          <div>✓ Crew assigned and confirmed</div>
-          <div>✓ Worker info sent to your phone</div>
+          <div>✓ Payment method authorized (not yet charged)</div>
+          <div>✓ Matching workers to your job now</div>
+          <div>✓ You'll be charged only once a crew is confirmed</div>
         </div>
       </div>
       <button onClick={()=>onNav("home")} style={{...btn(),padding:"13px 28px"}}>Back to Home →</button>
