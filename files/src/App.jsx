@@ -1993,7 +1993,7 @@ function AdminPortal({ token, onLogout }) {
               <div style={{width:6,height:6,borderRadius:"50%",background:C.green,boxShadow:`0 0 6px ${C.green}`}}/>
             </div>
             {normalizedJobs.filter(j=>j.status!=="Completed").map(j=>(
-              <div key={j.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 0",borderBottom:`1px solid ${C.border}`,flexWrap:"wrap",gap:8}}>
+              <div key={j.id} onClick={()=>{setTab("jobs");}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 0",borderBottom:`1px solid ${C.border}`,flexWrap:"wrap",gap:8,cursor:"pointer"}}>
                 <div>
                   <span style={{color:C.amber,fontWeight:700,marginRight:10}}>{j.id}</span>
                   <span style={{color:C.chalk,fontSize:13}}>{j.customer}</span>
@@ -2046,8 +2046,8 @@ function AdminPortal({ token, onLogout }) {
                   {locSearchResults.within50.length === 0 ? (
                     <div style={{fontSize:12,color:C.muted}}>No workers within 50 miles</div>
                   ) : locSearchResults.within50.map(w => (
-                    <div key={w.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.navyLight,borderRadius:6,marginBottom:4,fontSize:13}}>
-                      <span>{w.name} — {w.city}, {w.state}</span>
+                    <div key={w.id} onClick={()=>{setTab("workers");setSearch(w.name);}} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.navyLight,borderRadius:6,marginBottom:4,fontSize:13,cursor:"pointer"}} title="Click to view full details and contact info">
+                      <span>{w.name} — {w.city}, {w.state} · <span style={{color:C.muted}}>{w.phone}</span></span>
                       <span style={{color:C.muted}}>{w.distance_miles} mi</span>
                     </div>
                   ))}
@@ -2058,8 +2058,8 @@ function AdminPortal({ token, onLogout }) {
                   {locSearchResults.within100.length === 0 ? (
                     <div style={{fontSize:12,color:C.muted}}>No workers in this range</div>
                   ) : locSearchResults.within100.map(w => (
-                    <div key={w.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.navyLight,borderRadius:6,marginBottom:4,fontSize:13}}>
-                      <span>{w.name} — {w.city}, {w.state}</span>
+                    <div key={w.id} onClick={()=>{setTab("workers");setSearch(w.name);}} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.navyLight,borderRadius:6,marginBottom:4,fontSize:13,cursor:"pointer"}} title="Click to view full details and contact info">
+                      <span>{w.name} — {w.city}, {w.state} · <span style={{color:C.muted}}>{w.phone}</span></span>
                       <span style={{color:C.muted}}>{w.distance_miles} mi</span>
                     </div>
                   ))}
@@ -2280,7 +2280,7 @@ function AdminPortal({ token, onLogout }) {
                     <div style={{color:C.muted,fontSize:13}}>No workers assigned yet. Use Re-Dispatch to find workers.</div>
                   ) : (
                     jobWorkers[j.rawId].map(w=>(
-                      <div key={w.worker_id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${C.border}`,flexWrap:"wrap",gap:8}}>
+                      <div key={w.worker_id} onClick={()=>{setTab("workers");setSearch(w.name);}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${C.border}`,flexWrap:"wrap",gap:8,cursor:"pointer"}} title="Click to view full details and contact info">
                         <div>
                           <span style={{color:C.chalk,fontWeight:600,fontSize:13}}>{w.name}</span>
                           <span style={{color:C.muted,fontSize:12,marginLeft:10}}>{w.phone}</span>
@@ -2299,7 +2299,7 @@ function AdminPortal({ token, onLogout }) {
                             <span style={{fontSize:10,color:C.muted}}>📱 SMS sent</span>
                           )}
                           {w.confirmed && !w.no_show && (
-                            <button onClick={()=>handleNoShow(j.rawId, w.worker_id, w.name)} style={{background:"transparent",color:C.red,border:`1px solid ${C.red}44`,padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                            <button onClick={(e)=>{e.stopPropagation();handleNoShow(j.rawId, w.worker_id, w.name);}} style={{background:"transparent",color:C.red,border:`1px solid ${C.red}44`,padding:"3px 10px",borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer"}}>
                               Mark No-Show
                             </button>
                           )}
@@ -2462,7 +2462,7 @@ function AdminPortal({ token, onLogout }) {
         </div>
       )}
 
-      {tab==="dispatch" && <DispatchSim workers={normalizedWorkers} states={STATES} />}
+      {tab==="dispatch" && <DispatchSim workers={normalizedWorkers} states={STATES} onViewWorker={(name)=>{setTab("workers");setSearch(name);}} />}
       </>
       )}
     </div>
@@ -2470,7 +2470,7 @@ function AdminPortal({ token, onLogout }) {
 }
 
 // ─── DISPATCH SIMULATOR ───────────────────────────────────────────────────────
-function DispatchSim({ workers, states }) {
+function DispatchSim({ workers, states, onViewWorker }) {
   const [state, setState] = useState("");
   const [skill, setSkill] = useState("Loading");
   const [crew, setCrew] = useState(4);
@@ -2531,7 +2531,7 @@ function DispatchSim({ workers, states }) {
             {dispatched ? `Targeting ${crew} confirmed + ${Math.max(candidates.length-crew,0)} backups` : "Run dispatch to send SMS offers"}
           </div>
           {candidates.map((w,i)=>(
-            <div key={w.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:`1px solid ${C.border}`,flexWrap:"wrap",gap:8}}>
+            <div key={w.id} onClick={()=>onViewWorker(w.name)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:`1px solid ${C.border}`,flexWrap:"wrap",gap:8,cursor:"pointer"}} title="Click to view full details and contact info">
               <div>
                 <div style={{color:C.chalk,fontWeight:600}}>{w.name}</div>
                 <div style={{fontSize:12,color:C.muted}}>{w.city}, {w.state} · {w.phone}</div>
