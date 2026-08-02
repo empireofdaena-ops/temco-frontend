@@ -1310,6 +1310,53 @@ function AdminPortal({ token, onLogout }) {
   const [locSearchLoading, setLocSearchLoading] = useState(false);
   const [locSearchError, setLocSearchError] = useState("");
 
+  const renderLocationWorkerRow = (w) => (
+    <div key={w.id} style={{marginBottom:4}}>
+      <div onClick={()=>{
+          if (expandedWorkerId===w.id) { setExpandedWorkerId(null); return; }
+          setExpandedWorkerId(w.id);
+          setWorkerNotesDraft(prev => ({...prev, [w.id]: prev[w.id] ?? w.notes ?? ""}));
+          setWorkerTempDraft(prev => ({...prev, [w.id]: prev[w.id] ?? w.temperature ?? ""}));
+        }} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:expandedWorkerId===w.id?C.amber+"22":C.navyLight,border:expandedWorkerId===w.id?`1px solid ${C.amber}`:"1px solid transparent",borderRadius:6,fontSize:13,cursor:"pointer"}} title="Click to view full details">
+        <span>{w.name} — {w.city}, {w.state} · <span style={{color:C.muted}}>{w.phone}</span></span>
+        <span style={{color:C.muted}}>{w.distance_miles} mi</span>
+      </div>
+      {expandedWorkerId===w.id && (
+        <div style={{padding:"14px 16px",background:C.navyLight,border:`1px solid ${C.border}`,borderTop:"none",borderRadius:"0 0 6px 6px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 200px",gap:14,marginBottom:8}}>
+            <div>
+              <label style={label}>Relationship Notes</label>
+              <textarea
+                style={{...field,resize:"vertical",minHeight:64}}
+                value={workerNotesDraft[w.id] ?? ""}
+                onChange={e=>setWorkerNotesDraft(prev=>({...prev,[w.id]:e.target.value}))}
+                placeholder="e.g. Called 7/20 — reliable, prefers weekend jobs, interested in crew lead role..."
+              />
+            </div>
+            <div>
+              <label style={label}>Temperature</label>
+              <select style={field} value={workerTempDraft[w.id] ?? ""} onChange={e=>setWorkerTempDraft(prev=>({...prev,[w.id]:e.target.value}))}>
+                <option value="">— Not set —</option>
+                {TEMP_OPTIONS.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <button onClick={()=>handleSaveWorkerNote(w.id)} disabled={!!workerNoteSaving[w.id]} style={{...btn(),padding:"8px 16px",fontSize:12,opacity:workerNoteSaving[w.id]?0.6:1}}>
+              {workerNoteSaving[w.id] ? "Saving..." : "Save"}
+            </button>
+            {workerNoteResult[w.id] && (
+              <span style={{fontSize:12,color:workerNoteResult[w.id].startsWith("✓")?C.green:C.red,fontWeight:600}}>{workerNoteResult[w.id]}</span>
+            )}
+            {w.last_contacted && (
+              <span style={{fontSize:11,color:C.muted}}>Last contacted: {new Date(w.last_contacted).toLocaleString()}</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   const handleLocationSearch = async () => {
     if (!locSearchCity.trim() || !locSearchState.trim()) {
       setLocSearchError("Enter both a city and state");
@@ -2045,24 +2092,14 @@ function AdminPortal({ token, onLogout }) {
                   <div style={{fontSize:13,fontWeight:700,color:C.green,marginBottom:8}}>Within 50 miles ({locSearchResults.within50.length})</div>
                   {locSearchResults.within50.length === 0 ? (
                     <div style={{fontSize:12,color:C.muted}}>No workers within 50 miles</div>
-                  ) : locSearchResults.within50.map(w => (
-                    <div key={w.id} onClick={()=>{setTab("workers");setSearch(w.name);}} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.navyLight,borderRadius:6,marginBottom:4,fontSize:13,cursor:"pointer"}} title="Click to view full details and contact info">
-                      <span>{w.name} — {w.city}, {w.state} · <span style={{color:C.muted}}>{w.phone}</span></span>
-                      <span style={{color:C.muted}}>{w.distance_miles} mi</span>
-                    </div>
-                  ))}
+                  ) : locSearchResults.within50.map(renderLocationWorkerRow)}
                 </div>
 
                 <div style={{marginBottom:18}}>
                   <div style={{fontSize:13,fontWeight:700,color:C.amberDim,marginBottom:8}}>50–100 miles ({locSearchResults.within100.length})</div>
                   {locSearchResults.within100.length === 0 ? (
                     <div style={{fontSize:12,color:C.muted}}>No workers in this range</div>
-                  ) : locSearchResults.within100.map(w => (
-                    <div key={w.id} onClick={()=>{setTab("workers");setSearch(w.name);}} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.navyLight,borderRadius:6,marginBottom:4,fontSize:13,cursor:"pointer"}} title="Click to view full details and contact info">
-                      <span>{w.name} — {w.city}, {w.state} · <span style={{color:C.muted}}>{w.phone}</span></span>
-                      <span style={{color:C.muted}}>{w.distance_miles} mi</span>
-                    </div>
-                  ))}
+                  ) : locSearchResults.within100.map(renderLocationWorkerRow)}
                 </div>
 
                 {locSearchResults.beyond100.length > 0 && (
