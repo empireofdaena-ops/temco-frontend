@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const API_BASE = "https://temco-backend-production.up.railway.app";
@@ -1204,7 +1204,106 @@ function AdminLogin({ onLogin }) {
 }
 
 // ─── ADMIN PORTAL ─────────────────────────────────────────────────────────────
+// ─── SQUARE BACKUP CARD FORM (admin-triggered, embedded in job detail view) ────
+// Loads Square's Web Payments SDK, renders a card entry field, and on submit
+// tokenizes the card client-side then sends that token to the backend to
+// authorize (hold) a Square payment — mirrors the Stripe manual-capture flow.
+function SquareCardForm({ jobId, token, onDone }) {
+  const [status, setStatus] = useState("loading"); // loading | ready | submitting | success | error
+  const [errorMsg, setErrorMsg] = useState("");
+  const cardRef = useRef(null);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function init() {
+      try {
+        const configRes = await fetch(`${API_BASE}/api/payments/square/config`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const configData = await configRes.json();
+        if (cancelled) return;
+
+        const sdkUrl = configData.environment === "production"
+          ? "https://web.squarecdn.com/v1/square.js"
+          : "https://sandbox.web.squarecdn.com/v1/square.js";
+
+        if (!document.querySelector(`script[src="${sdkUrl}"]`)) {
+          const script = document.createElement("script");
+          script.src = sdkUrl;
+          script.async = true;
+          document.body.appendChild(script);
+          await new Promise((resolve, reject) => {
+            script.onload = resolve;
+            script.onerror = () => reject(new Error("Failed to load Square SDK"));
+          });
+        }
+
+        if (cancelled) return;
+        const payments = window.Square.payments(configData.applicationId, configData.locationId);
+        const card = await payments.card();
+        await card.attach(containerRef.current);
+        cardRef.current = card;
+        setStatus("ready");
+      } catch (err) {
+        console.error("Square SDK init error:", err);
+        setStatus("error");
+        setErrorMsg("Could not load Square payment form. Try refreshing the page.");
+      }
+    }
+
+    init();
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const handleSubmit = async () => {
+    if (!cardRef.current) return;
+    setStatus("submitting");
+    setErrorMsg("");
+    try {
+      const result = await cardRef.current.tokenize();
+      if (result.status !== "OK") {
+        throw new Error(result.errors?.[0]?.message || "Card was declined or invalid");
+      }
+      const res = await fetch(`${API_BASE}/api/payments/square/create-payment`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, sourceId: result.token })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Payment authorization failed");
+      setStatus("success");
+      if (onDone) onDone();
+    } catch (err) {
+      setStatus("ready");
+      setErrorMsg(err.message);
+    }
+  };
+
+  return (
+    <div style={{background:C.navyLight,border:`1px solid ${C.border}`,borderRadius:10,padding:18,marginTop:10}}>
+      <div style={{fontSize:13,fontWeight:700,color:C.chalk,marginBottom:10}}>Square Backup Payment — Authorize Card</div>
+      {status === "loading" && <div style={{fontSize:12,color:C.muted}}>Loading payment form...</div>}
+      {status === "error" && <div style={{fontSize:12,color:C.red}}>{errorMsg}</div>}
+      <div ref={containerRef} style={{minHeight:90,marginBottom:10,display:(status==="ready"||status==="submitting")?"block":"none"}}/>
+      {(status === "ready" || status === "submitting") && (
+        <>
+          <button onClick={handleSubmit} disabled={status==="submitting"} style={{...btn(),padding:"10px 20px",fontSize:13,opacity:status==="submitting"?0.6:1}}>
+            {status === "submitting" ? "Authorizing..." : "Authorize Card (Hold, No Charge Yet)"}
+          </button>
+          {errorMsg && <div style={{fontSize:12,color:C.red,marginTop:8}}>{errorMsg}</div>}
+        </>
+      )}
+      {status === "success" && (
+        <div style={{fontSize:13,color:C.green,fontWeight:600}}>✓ Card authorized and held via Square. Use Finalize/Release Hold below as normal once crew status is known.</div>
+      )}
+    </div>
+  );
+}
+
 function AdminPortal({ token, onLogout }) {
+  const [squareFormJobId, setSquareFormJobId] = useState(null);
   const [tab, setTab] = useState("today");
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState("");
@@ -1275,11 +1374,12 @@ function AdminPortal({ token, onLogout }) {
     }
   };
 
-  const handleFinalizePayment = async (jobId) => {
+  const handleFinalizePayment = async (jobId, processor = 'stripe') => {
     if (!window.confirm("Capture payment for confirmed workers and release the crew to the customer? This charges the customer's held card for however many workers are currently confirmed.")) return;
     setActionLoading(prev => ({...prev, [jobId]: true}));
     try {
-      const res = await fetch(`${API_BASE}/api/payments/${jobId}/finalize`, {
+      const base = processor === 'square' ? `${API_BASE}/api/payments/square/${jobId}/finalize` : `${API_BASE}/api/payments/${jobId}/finalize`;
+      const res = await fetch(base, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
       });
@@ -1297,11 +1397,12 @@ function AdminPortal({ token, onLogout }) {
     }
   };
 
-  const handleCancelHold = async (jobId) => {
+  const handleCancelHold = async (jobId, processor = 'stripe') => {
     if (!window.confirm("Release the payment hold with no charge? Use this if a crew genuinely couldn't be filled — the customer will not be charged.")) return;
     setActionLoading(prev => ({...prev, [jobId]: true}));
     try {
-      const res = await fetch(`${API_BASE}/api/payments/${jobId}/cancel-hold`, {
+      const base = processor === 'square' ? `${API_BASE}/api/payments/square/${jobId}/cancel-hold` : `${API_BASE}/api/payments/${jobId}/cancel-hold`;
+      const res = await fetch(base, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
       });
@@ -1628,6 +1729,7 @@ function AdminPortal({ token, onLogout }) {
     type: j.work_type,
     status: j.status,
     payment_status: j.payment_status,
+    payment_processor: j.payment_processor || 'stripe',
     fee: parseFloat(j.dispatch_fee) || 0,
   })), [liveJobs]);
 
@@ -2042,13 +2144,18 @@ function AdminPortal({ token, onLogout }) {
                       📤 Release Crew to Customer
                     </button>
                     {j.payment_status==="Authorized" && (
-                      <button onClick={()=>handleFinalizePayment(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.amber,color:C.chalk,border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
-                        💳 Finalize & Capture Payment
+                      <button onClick={()=>handleFinalizePayment(j.rawId, j.payment_processor)} disabled={!!actionLoading[j.rawId]} style={{background:C.amber,color:C.chalk,border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
+                        💳 Finalize & Capture Payment {j.payment_processor==="square" ? "(Square)" : "(Stripe)"}
                       </button>
                     )}
                     {j.payment_status==="Authorized" && (
-                      <button onClick={()=>handleCancelHold(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:"transparent",color:C.muted,border:`1px solid ${C.border}`,padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
+                      <button onClick={()=>handleCancelHold(j.rawId, j.payment_processor)} disabled={!!actionLoading[j.rawId]} style={{background:"transparent",color:C.muted,border:`1px solid ${C.border}`,padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
                         🔓 Release Hold (No Charge)
+                      </button>
+                    )}
+                    {j.payment_status!=="Paid" && (
+                      <button onClick={()=>setSquareFormJobId(squareFormJobId===j.rawId?null:j.rawId)} style={{background:"transparent",color:C.chalk,border:`1px solid ${C.border}`,padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                        🔲 {squareFormJobId===j.rawId ? "Hide" : "Take"} Square Backup Payment
                       </button>
                     )}
                     <button onClick={()=>handleRedispatch(j.rawId)} disabled={!!actionLoading[j.rawId]} style={{background:C.blue,color:"white",border:"none",padding:"8px 16px",borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",opacity:actionLoading[j.rawId]?0.6:1}}>
@@ -2065,6 +2172,13 @@ function AdminPortal({ token, onLogout }) {
                       </button>
                     )}
                   </div>
+
+                  {squareFormJobId===j.rawId && (
+                    <SquareCardForm jobId={j.rawId} token={token} onDone={()=>{
+                      setLiveJobs(prev => prev.map(job => job.id===j.rawId ? {...job, payment_status:"Authorized", payment_processor:"square"} : job));
+                      setSquareFormJobId(null);
+                    }}/>
+                  )}
 
                   {actionResults[j.rawId] && (
                     <div style={{fontSize:12,color:actionResults[j.rawId].startsWith("✓")?C.green:actionResults[j.rawId].startsWith("⚠")?C.amber:C.red,marginBottom:14,padding:"8px 14px",background:C.navyLight,borderRadius:6,fontWeight:600}}>
