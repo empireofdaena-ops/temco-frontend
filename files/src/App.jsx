@@ -166,7 +166,7 @@ function PublicHome({ onNav, workerCount, stateCount }) {
 
       {/* SOCIAL PROOF — light, high-contrast strip */}
       <div style={{background:C.navyMid,borderTop:`1px solid ${C.border}`,borderBottom:`1px solid ${C.border}`,padding:"36px 56px",display:"flex",justifyContent:"center",flexWrap:"wrap"}}>
-        {[[`${workerCount}+`,"Active workers"],[`${stateCount}`,"States covered"],["97%","Fill rate"],["<10 min","Avg. match time"]].map(([num,label],i,arr)=>(
+        {[[workerCount!==null?`${workerCount}+`:"…","Active workers"],[stateCount!==null?`${stateCount}`:"…","States covered"],["<10 min","Avg. match time"]].map(([num,label],i,arr)=>(
           <div key={label} style={{textAlign:"center",padding:"0 44px",borderRight:i<arr.length-1?`1px solid ${C.border}`:"none"}}>
             <div style={{fontSize:28,fontWeight:800,color:C.chalk}}>{num}</div>
             <div style={{fontSize:12.5,color:C.grayLight,marginTop:5,fontWeight:500}}>{label}</div>
@@ -1304,6 +1304,37 @@ function SquareCardForm({ jobId, token, onDone }) {
 
 function AdminPortal({ token, onLogout }) {
   const [squareFormJobId, setSquareFormJobId] = useState(null);
+  const [locSearchCity, setLocSearchCity] = useState("");
+  const [locSearchState, setLocSearchState] = useState("");
+  const [locSearchResults, setLocSearchResults] = useState(null);
+  const [locSearchLoading, setLocSearchLoading] = useState(false);
+  const [locSearchError, setLocSearchError] = useState("");
+
+  const handleLocationSearch = async () => {
+    if (!locSearchCity.trim() || !locSearchState.trim()) {
+      setLocSearchError("Enter both a city and state");
+      return;
+    }
+    setLocSearchLoading(true);
+    setLocSearchError("");
+    setLocSearchResults(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/workers/search-by-location?city=${encodeURIComponent(locSearchCity)}&state=${encodeURIComponent(locSearchState)}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLocSearchResults(data);
+      } else {
+        setLocSearchError(data.error || "Search failed");
+      }
+    } catch (e) {
+      setLocSearchError("Could not reach server");
+    } finally {
+      setLocSearchLoading(false);
+    }
+  };
+
   const [tab, setTab] = useState("today");
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState("");
@@ -1948,7 +1979,12 @@ function AdminPortal({ token, onLogout }) {
             <StatCard label="Workers in Network" value={normalizedWorkers.length} color={C.green} sub={`${STATES.length} states`}/>
             <StatCard label="Active Jobs" value={normalizedJobs.filter(j=>j.status==="In Progress"||j.status==="Confirmed"||j.status==="Pending").length} color={C.amber}/>
             <StatCard label="Revenue (MTD)" value={`$${totalFees.toLocaleString()}`} color={C.chalk}/>
-            <StatCard label="Fill Rate" value="97%" color={C.green}/>
+            <StatCard label="Fill Rate" value={(() => {
+              const relevant = normalizedJobs.filter(j => j.status!=="Cancelled");
+              if (relevant.length === 0) return "—";
+              const filled = relevant.filter(j => j.status==="Confirmed"||j.status==="Completed"||j.status==="In Progress").length;
+              return `${Math.round((filled/relevant.length)*100)}%`;
+            })()} color={C.green}/>
           </div>
 
           <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:22,marginBottom:20}}>
@@ -1988,6 +2024,57 @@ function AdminPortal({ token, onLogout }) {
 
       {tab==="workers" && (
         <div>
+          <div style={{background:C.navyMid,border:`1px solid ${C.border}`,borderRadius:12,padding:18,marginBottom:20}}>
+            <div style={{fontWeight:700,color:C.chalk,marginBottom:12}}>📍 Find Workers Near a Location</div>
+            <div style={{display:"flex",gap:10,marginBottom:10,flexWrap:"wrap"}}>
+              <input style={{...field,flex:2,minWidth:140}} value={locSearchCity} onChange={e=>setLocSearchCity(e.target.value)} placeholder="City (e.g. Charleston)"/>
+              <input style={{...field,flex:1,minWidth:100}} value={locSearchState} onChange={e=>setLocSearchState(e.target.value)} placeholder="State (e.g. SC)"/>
+              <button onClick={handleLocationSearch} disabled={locSearchLoading} style={{...btn(),padding:"10px 20px",opacity:locSearchLoading?0.6:1}}>
+                {locSearchLoading ? "Searching..." : "Search"}
+              </button>
+            </div>
+            {locSearchError && <div style={{fontSize:13,color:C.red,marginBottom:8}}>{locSearchError}</div>}
+
+            {locSearchResults && (
+              <div style={{marginTop:14}}>
+                <div style={{fontSize:12,color:C.muted,marginBottom:14}}>
+                  {locSearchResults.total} workers found near {locSearchResults.searchedLocation.city}, {locSearchResults.searchedLocation.state}
+                </div>
+
+                <div style={{marginBottom:18}}>
+                  <div style={{fontSize:13,fontWeight:700,color:C.green,marginBottom:8}}>Within 50 miles ({locSearchResults.within50.length})</div>
+                  {locSearchResults.within50.length === 0 ? (
+                    <div style={{fontSize:12,color:C.muted}}>No workers within 50 miles</div>
+                  ) : locSearchResults.within50.map(w => (
+                    <div key={w.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.navyLight,borderRadius:6,marginBottom:4,fontSize:13}}>
+                      <span>{w.name} — {w.city}, {w.state}</span>
+                      <span style={{color:C.muted}}>{w.distance_miles} mi</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{marginBottom:18}}>
+                  <div style={{fontSize:13,fontWeight:700,color:C.amberDim,marginBottom:8}}>50–100 miles ({locSearchResults.within100.length})</div>
+                  {locSearchResults.within100.length === 0 ? (
+                    <div style={{fontSize:12,color:C.muted}}>No workers in this range</div>
+                  ) : locSearchResults.within100.map(w => (
+                    <div key={w.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.navyLight,borderRadius:6,marginBottom:4,fontSize:13}}>
+                      <span>{w.name} — {w.city}, {w.state}</span>
+                      <span style={{color:C.muted}}>{w.distance_miles} mi</span>
+                    </div>
+                  ))}
+                </div>
+
+                {locSearchResults.beyond100.length > 0 && (
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:C.muted,marginBottom:8}}>Beyond 100 miles ({locSearchResults.beyond100.length})</div>
+                    <div style={{fontSize:12,color:C.muted}}>Click "Search" results above for closer matches — this tier is shown for reference only.</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div style={{display:"flex",gap:14,marginBottom:20,flexWrap:"wrap"}}>
             <StatCard label="Total Workers" value={normalizedWorkers.length} sub={`${STATES.length} states covered`}/>
             <StatCard label="With Crew/Team" value={normalizedWorkers.filter(w=>w.crew).length} color={C.amber}/>
@@ -2634,6 +2721,14 @@ export default function App() {
   const [adminToken, setAdminToken] = useState(null);
   const [customerToken, setCustomerToken] = useState(() => localStorage.getItem('temco_customer_token'));
   const [workerToken, setWorkerToken] = useState(() => localStorage.getItem('temco_worker_token'));
+  const [publicStats, setPublicStats] = useState({ workerCount: null, stateCount: null });
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/stats/public`)
+      .then(res => res.json())
+      .then(data => setPublicStats(data))
+      .catch(() => {}); // homepage still works fine without this; falls back below
+  }, []);
 
   const navigate = (newPage) => {
     const path = pathForPage(newPage);
@@ -2712,7 +2807,7 @@ export default function App() {
   ];
 
   const pages = {
-    home:<PublicHome onNav={navigate} workerCount={546} stateCount={49}/>,
+    home:<PublicHome onNav={navigate} workerCount={publicStats.workerCount} stateCount={publicStats.stateCount}/>,
     request:<RequestForm onNav={navigate} onAuth={handleCustomerAuth} states={FALLBACK_STATES}/>,
     "worker-signup":<WorkerSignup states={FALLBACK_STATES}/>,
     "customer-portal": customerToken
